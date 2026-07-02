@@ -50,6 +50,14 @@ UREncodeResult *GuiGetCakeData(void)
     return urEncode;
 }
 
+UREncodeResult *GuiGetDcrData(void)
+{
+    char *xPub = GetCurrentAccountPublicKey(XPUB_TYPE_DCR);
+    UREncodeResult *urEncode = get_connect_decred_wallet_ur(xPub);
+    CHECK_CHAIN_PRINT(urEncode);
+    return urEncode;
+}
+
 void ClosePrivateQrMode(void)
 {
     if (g_pincode == NULL) {

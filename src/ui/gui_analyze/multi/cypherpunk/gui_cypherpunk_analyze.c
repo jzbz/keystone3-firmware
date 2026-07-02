@@ -7,6 +7,8 @@ GetCustomContainerFunc GetOtherChainCustomFunc(char *funcName)
 {
     if (!strcmp(funcName, "GuiZcashOverview")) {
         return GuiZcashOverview;
+    } else if (!strcmp(funcName, "GuiDcrTxOverview")) {
+        return GuiDcrTxOverview;
     } else if (!strcmp(funcName, "GuiShowXmrOutputsDetails")) {
         return GuiShowXmrOutputsDetails;
     } else if (!strcmp(funcName, "GuiShowXmrTransactionDetails")) {

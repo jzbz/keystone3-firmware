@@ -125,11 +125,13 @@ const static CoinWalletInfo_t g_coinWalletBtn[] = {
     {CHAIN_TGD, "", &coinTgd},
     {CHAIN_DOT, "", &coinDot},
     {CHAIN_ZCASH, "", &coinZec},
+    {CHAIN_DCR, "", &coinDcr},
 #endif
 
 #ifdef CYPHERPUNK_VERSION
     {CHAIN_ZCASH, "", &coinZec},
     {CHAIN_XMR, "", &coinXmr},
+    {CHAIN_DCR, "", &coinDcr},
 #endif
 };
 
@@ -175,6 +177,7 @@ const static WalletInfo_t g_walletBtn[] = {
     {WALLET_LIST_SUIET, "Suiet", &walletSuiet},
     // {WALLET_LIST_CAKE, "Cake Wallet", &walletCake},
     {WALLET_LIST_FEATHER, "Feather Wallet", &walletFeather},
+    {WALLET_LIST_DECRED, "Decred Wallet", &walletDecred},
     {WALLET_LIST_CORE, "Core Wallet", &walletCore},
     {WALLET_LIST_IOTA, "IOTA Wallet", &walletIota},
 #endif
@@ -189,6 +192,7 @@ const static WalletInfo_t g_walletBtn[] = {
     {WALLET_LIST_FEATHER, "Feather Wallet", &walletFeather},
     {WALLET_LIST_ZODL, "Zodl", &walletZodl},
     {WALLET_LIST_VIZOR, "Vizor", &walletVizor},
+    {WALLET_LIST_DECRED, "Decred Wallet", &walletDecred},
 #endif
 
 #ifdef BTC_ONLY

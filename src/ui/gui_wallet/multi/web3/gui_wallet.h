@@ -25,6 +25,7 @@ UREncodeResult *GuiGetHeliumData(void);
 UREncodeResult *GuiGetXBullData(void);
 UREncodeResult *GuiGetBackpackData(void);
 UREncodeResult *GuiGetXrpToolkitDataByIndex(uint16_t index);
+UREncodeResult *GuiGetDcrData(void);
 UREncodeResult *GuiGetADADataByIndex(char *walletName);
 UREncodeResult *GuiGetImTokenData(void);
 UREncodeResult *GuiGetCoreWalletData(void);

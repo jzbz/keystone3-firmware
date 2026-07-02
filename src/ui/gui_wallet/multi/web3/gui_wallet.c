@@ -461,6 +461,14 @@ UREncodeResult *GuiGetKeplrDataByIndex(uint32_t index)
     return urEncode;
 }
 
+UREncodeResult *GuiGetDcrData(void)
+{
+    char *xPub = GetCurrentAccountPublicKey(XPUB_TYPE_DCR);
+    UREncodeResult *urEncode = get_connect_decred_wallet_ur(xPub);
+    CHECK_CHAIN_PRINT(urEncode);
+    return urEncode;
+}
+
 UREncodeResult *GuiGetXrpToolkitDataByIndex(uint16_t index)
 {
     uint8_t mfp[4] = {0};

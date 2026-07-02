@@ -117,6 +117,8 @@ GetCustomContainerFunc GetOtherChainCustomFunc(char *funcName)
         return GuiCustomPathNotice;
     } else if (!strcmp(funcName, "GuiZcashOverview")) {
         return GuiZcashOverview;
+    } else if (!strcmp(funcName, "GuiDcrTxOverview")) {
+        return GuiDcrTxOverview;
     }
 
     return NULL;

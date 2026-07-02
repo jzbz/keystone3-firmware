@@ -4,6 +4,13 @@
 #define _GUI_CYPHERPUNK_ANALYZE_WIDGETS_H
 #define GUI_ANALYZE_OBJ_SURPLUS \
     { \
+        REMAPVIEW_DCR, \
+        "{\"name\":\"dcr_page\",\"type\":\"custom_container\",\"pos\":[36,0],\"size\":[408,900],\"bg_color\":0,\"custom_show_func\":\"GuiDcrTxOverview\"}", \
+        GuiGetDcrGUIData, \
+        NULL, \
+        FreeDcrMemory, \
+    }, \
+    { \
         REMAPVIEW_ZCASH, \
         "{\"name\":\"zcash_page\",\"type\":\"custom_container\",\"pos\":[36,0],\"size\":[408,900],\"bg_color\":0,\"custom_show_func\":\"GuiZcashOverview\"}", \
         GuiGetZcashGUIData, \

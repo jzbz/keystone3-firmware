@@ -202,6 +202,10 @@ static const lv_img_dsc_t *g_xrpCoinArray[1] = {
     &coinXrp,
 };
 
+static const lv_img_dsc_t *g_dcrCoinArray[1] = {
+    &coinDcr,
+};
+
 static CoinState_t g_defaultFewchaState[FEWCHA_COINS_BUTT] = {
     {APT, true},
     {SUI, false},
@@ -235,6 +239,7 @@ WalletListItem_t g_walletListArray[] = {
     {WALLET_LIST_SAFE, &walletSafe, "Safe", g_ethWalletCoinArray, 4, true, WALLET_FILTER_ETH},
     {WALLET_LIST_BLOCK_WALLET, &walletBlockWallet, "BlockWallet", g_ethWalletCoinArray, 4, true, WALLET_FILTER_ETH},
     {WALLET_LIST_XRP_TOOLKIT, &walletXRPToolkit, "XRP Toolkit", g_xrpCoinArray, 1, true, WALLET_FILTER_OTHER},
+    {WALLET_LIST_DECRED, &walletDecred, "Decred", g_dcrCoinArray, 1, true, WALLET_FILTER_OTHER},
     {WALLET_LIST_THORWALLET, &walletThorWallet, "THORWallet", g_ThorWalletCoinArray, 2, true, WALLET_FILTER_ETH | WALLET_FILTER_OTHER},
     {WALLET_LIST_PETRA, &walletPetra, "Petra", g_petraCoinArray, 1, true, WALLET_FILTER_OTHER},
     {WALLET_LIST_KEPLR, &walletKeplr, "Keplr", g_keplrCoinArray, 8, true, WALLET_FILTER_OTHER},
@@ -1253,6 +1258,10 @@ void GuiConnectWalletSetQrdata(WALLET_LIST_INDEX_ENUM index)
     case WALLET_LIST_XRP_TOOLKIT:
         func = GuiGetXrpToolkitData;
         AddChainAddress();
+        break;
+    case WALLET_LIST_DECRED:
+        func = GuiGetDcrData;
+        AddCoinsFromArray(g_dcrCoinArray, NUMBER_OF_ARRAYS(g_dcrCoinArray), false, 0);
         break;
     case WALLET_LIST_THORWALLET:
         func = GuiGetThorWalletData;

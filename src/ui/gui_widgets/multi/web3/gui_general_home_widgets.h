@@ -57,7 +57,8 @@
                                        HOME_WALLET_CARD_IOV,     \
                                        HOME_WALLET_CARD_UMEE,    \
                                        HOME_WALLET_CARD_QCK,     \
-                                       HOME_WALLET_CARD_TGD // last one cant not with comma
+                                       HOME_WALLET_CARD_TGD,     \
+                                       HOME_WALLET_CARD_DCR // last one cant not with comma
 
 #define HOME_WALLET_STATE_SURPLUS                         \
     {HOME_WALLET_CARD_ETH, false, "ETH", true},           \
@@ -115,8 +116,9 @@
         {HOME_WALLET_CARD_IOV, false, "IOV", true},       \
         {HOME_WALLET_CARD_UMEE, false, "UMEE", true},     \
         {HOME_WALLET_CARD_QCK, false, "QCK", true},       \
+        {HOME_WALLET_CARD_TGD, false, "TGD", true},       \
     {                                                     \
-        HOME_WALLET_CARD_TGD, false, "TGD", true          \
+        HOME_WALLET_CARD_DCR, false, "DCR", true          \
     }
 // last one cant not with comma
 
@@ -456,6 +458,12 @@
         .coin = "TGD",                         \
         .chain = "Tgrade",                     \
         .icon = &coinTgd,                      \
+    },                                         \
+    {                                          \
+        .index = HOME_WALLET_CARD_DCR,         \
+        .coin = "DCR",                         \
+        .chain = "Decred",                     \
+        .icon = &coinDcr,                      \
     }
 #endif
 #endif
