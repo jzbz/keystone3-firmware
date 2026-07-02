@@ -109,6 +109,7 @@ static const ViewHandlerEntry g_viewHandlerMap[] = {
     {TonTx, GuiGetTonSignQrCodeData, NULL, GuiGetTonCheckResult, CHAIN_TON, REMAPVIEW_TON},
     {TonSignProof, GuiGetTonProofSignQrCodeData, NULL, GuiGetTonCheckResult, CHAIN_TON, REMAPVIEW_TON_SIGNPROOF},
     {ZcashTx, GuiGetZcashSignQrCodeData, NULL, GuiGetZcashCheckResult, CHAIN_ZCASH, REMAPVIEW_ZCASH},
+    {DcrTx, GuiGetDcrSignQrCodeData, NULL, GuiGetDcrCheckResult, CHAIN_DCR, REMAPVIEW_DCR},
 #endif
 
 #ifdef CYPHERPUNK_VERSION
@@ -116,6 +117,7 @@ static const ViewHandlerEntry g_viewHandlerMap[] = {
     {ZcashBatchTx, GuiGetZcashBatchSignQrCodeData, GuiGetZcashBatchSignUrDataUnlimited, GuiGetZcashBatchCheckResult, CHAIN_ZCASH, REMAPVIEW_ZCASH_BATCH_TX},
     {XmrOutput, GuiGetMoneroKeyimagesQrCodeData, NULL, GuiGetMoneroOutputCheckResult, CHAIN_XMR, REMAPVIEW_XMR_OUTPUT},
     {XmrTxUnsigned, GuiGetMoneroSignedTransactionQrCodeData, NULL, GuiGetMoneroUnsignedTxCheckResult, CHAIN_XMR, REMAPVIEW_XMR_UNSIGNED},
+    {DcrTx, GuiGetDcrSignQrCodeData, NULL, GuiGetDcrCheckResult, CHAIN_DCR, REMAPVIEW_DCR},
 #endif
 };
 

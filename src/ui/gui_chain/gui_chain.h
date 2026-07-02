@@ -8,6 +8,7 @@
 #ifdef CYPHERPUNK_VERSION
 #include "gui_zcash_batch_widgets.h"
 #endif
+#include "gui_dcr.h"
 #ifdef WEB3_VERSION
 #include "gui_eth.h"
 #include "gui_eth_batch_tx_widgets.h"
@@ -93,6 +94,7 @@ typedef enum {
     CHAIN_QCK,
     CHAIN_TGD,
     // cosmos end
+    CHAIN_DCR,
 #endif
 
 #ifndef BTC_ONLY
@@ -101,6 +103,7 @@ typedef enum {
 
 #ifdef CYPHERPUNK_VERSION
     CHAIN_XMR,
+    CHAIN_DCR,
 #endif
     CHAIN_BUTT,
 } GuiChainCoinType;
@@ -139,6 +142,7 @@ typedef enum {
     REMAPVIEW_TON_SIGNPROOF,
     REMAPVIEW_AVAX,
     REMAPVIEW_ZCASH,
+    REMAPVIEW_DCR,
 #endif
 
 #ifdef CYPHERPUNK_VERSION
@@ -146,6 +150,7 @@ typedef enum {
     REMAPVIEW_ZCASH_BATCH_TX,
     REMAPVIEW_XMR_OUTPUT,
     REMAPVIEW_XMR_UNSIGNED,
+    REMAPVIEW_DCR,
 #endif
     REMAPVIEW_WEB_AUTH,
     REMAPVIEW_BUTT,

@@ -51,6 +51,7 @@ app_solana = { workspace = true, optional = true }
 app_near = { workspace = true, optional = true }
 app_xrp = { workspace = true, optional = true }
 app_cosmos = { workspace = true, optional = true }
+app_decred = { workspace = true, optional = true }
 app_aptos = { workspace = true, optional = true }
 app_sui = { workspace = true, optional = true }
 app_arweave = { workspace = true, optional = true }
@@ -76,6 +77,7 @@ dash = []
 bch = []
 cardano = ["dep:app_cardano"]
 cosmos = ["dep:app_cosmos"]
+decred = ["dep:app_decred"]
 ethereum = ["dep:app_ethereum"]
 near = ["dep:app_near"]
 solana = ["dep:app_solana"]
@@ -102,6 +104,7 @@ multi-coins = [
     "cardano",
     "cosmos",
     "dash",
+    "decred",
     "ethereum",
     "ltc",
     "doge",
@@ -121,7 +124,7 @@ multi-coins = [
 
 btc-only = ["bitcoin", "keystore/multi_coins"]
 
-cypherpunk = ["bitcoin", "zcash_cypherpunk", "monero", "keystore/cypherpunk"]
+cypherpunk = ["bitcoin", "zcash_cypherpunk", "monero", "decred", "keystore/cypherpunk"]
 
 # build variants
 # production

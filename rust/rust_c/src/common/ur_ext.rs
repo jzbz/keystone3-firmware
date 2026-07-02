@@ -69,6 +69,8 @@ use ur_registry::tron::tron_sign_request::TronSignRequest;
 use ur_registry::zcash::zcash_pczt::ZcashPczt;
 #[cfg(feature = "zcash_cypherpunk")]
 use ur_registry::zcash::zcash_sign_batch::ZcashSignBatch;
+#[cfg(feature = "decred")]
+use ur_registry::decred::dcr_sign_request::DcrSignRequest;
 
 use super::ur::ViewType;
 
@@ -229,6 +231,13 @@ impl InferViewType for ZcashPczt {
 impl InferViewType for ZcashSignBatch {
     fn infer(&self) -> Result<ViewType, URError> {
         Ok(ViewType::ZcashBatchTx)
+    }
+}
+
+#[cfg(feature = "decred")]
+impl InferViewType for DcrSignRequest {
+    fn infer(&self) -> Result<ViewType, URError> {
+        Ok(ViewType::DcrTx)
     }
 }
 

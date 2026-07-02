@@ -38,6 +38,8 @@ use app_tron::errors::TronError;
 use app_xrp::errors::XRPError;
 #[cfg(feature = "zcash")]
 use app_zcash::errors::ZcashError;
+#[cfg(feature = "decred")]
+use app_decred::errors::DecredError;
 
 #[derive(Debug, Clone)]
 #[repr(C)]
@@ -250,6 +252,12 @@ pub enum ErrorCodes {
     IotaSignFailure,
     IotaUnexpectedEof,
     IotaInvalidField,
+
+    // Decred
+    DecredGenerateAddressError = 1900,
+    DecredSigningError,
+    DecredUnsupportedVersion,
+    DecredScriptMismatch,
 }
 
 impl ErrorCodes {
@@ -584,6 +592,20 @@ impl From<&ZcashError> for ErrorCodes {
             ZcashError::SigningError(_) => Self::ZcashSigningError,
             ZcashError::InvalidPczt(_) => Self::ZcashInvalidPczt,
             ZcashError::PcztNoMyInputs => Self::MasterFingerprintMismatch,
+        }
+    }
+}
+
+#[cfg(feature = "decred")]
+impl From<&DecredError> for ErrorCodes {
+    fn from(value: &DecredError) -> Self {
+        match value {
+            DecredError::GenerateAddressError(_) => Self::DecredGenerateAddressError,
+            DecredError::InvalidDataError(_) => Self::InvalidData,
+            DecredError::SigningError(_) => Self::DecredSigningError,
+            DecredError::UnsupportedVersion => Self::DecredUnsupportedVersion,
+            DecredError::SigHashIndex => Self::InvalidData,
+            DecredError::ScriptMismatch => Self::DecredScriptMismatch,
         }
     }
 }

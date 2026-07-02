@@ -31,6 +31,7 @@ static SetChainData_t g_chainViewArray[] = {
 #ifdef CYPHERPUNK_VERSION
     {REMAPVIEW_ZCASH, (SetChainDataFunc)GuiSetZcashUrData},
     {REMAPVIEW_ZCASH_BATCH_TX, (SetChainDataFunc)GuiSetZcashBatchUrData},
+    {REMAPVIEW_DCR, (SetChainDataFunc)GuiSetDcrUrData},
     {REMAPVIEW_XMR_OUTPUT, (SetChainDataFunc)GuiSetMoneroUrData},
     {REMAPVIEW_XMR_UNSIGNED, (SetChainDataFunc)GuiSetMoneroUrData},
 #endif
@@ -64,6 +65,7 @@ static SetChainData_t g_chainViewArray[] = {
     {REMAPVIEW_IOTA, (SetChainDataFunc)GuiSetIotaUrData},
     {REMAPVIEW_IOTA_SIGN_MESSAGE_HASH, (SetChainDataFunc)GuiSetIotaUrData},
     {REMAPVIEW_ZCASH, (SetChainDataFunc)GuiSetZcashUrData},
+    {REMAPVIEW_DCR, (SetChainDataFunc)GuiSetDcrUrData},
 #endif
 };
 

@@ -7,6 +7,7 @@ members = [
     "apps/bitcoin",
     "apps/cardano",
     "apps/cosmos",
+    "apps/decred",
     "apps/ethereum",
     # "apps/near",  # Temporarily disabled
     "apps/solana",
@@ -38,6 +39,7 @@ app_arweave = { path = "apps/arweave" }
 app_bitcoin = { path = "apps/bitcoin" }
 app_cardano = { path = "apps/cardano" }
 app_cosmos = { path = "apps/cosmos", default-features = false }
+app_decred = { path = "apps/decred" }
 app_ethereum = { path = "apps/ethereum" }
 app_avalanche = { path = "apps/avalanche" }
 app_near = { path = "apps/near" }  # Dependency kept, but member disabled
@@ -120,3 +122,8 @@ getrandom = "0.2"
 minicbor = { version = "0.19", features = ["alloc"] }
 zeroize = { version = "1.8.2", default-features = false }
 # third party dependencies end
+
+# Vendored with Decred UR registry types (dcr-sign-request / dcr-signed-tx)
+# added on top of the published 1.0.5; see rust/vendor/ur-registry.
+[patch.crates-io]
+ur-registry = { path = "vendor/ur-registry" }

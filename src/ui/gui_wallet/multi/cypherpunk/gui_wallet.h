@@ -10,6 +10,7 @@ UREncodeResult *GuiGetStandardBtcData(void);
 UREncodeResult *GuiGetCompanionAppData(void);
 UREncodeResult *GuiGetBitgetWalletData(void);
 UREncodeResult *GuiGetCakeData(void);
+UREncodeResult *GuiGetDcrData(void);
 uint8_t *OpenPrivateQrMode(void);
 void ClosePrivateQrMode(void);
 bool IsPrivateQrMode(void);

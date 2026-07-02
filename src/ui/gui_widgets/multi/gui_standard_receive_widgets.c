@@ -921,12 +921,20 @@ static void ModelGetAddress(uint32_t index, AddressDataItem_t *item)
         GetZcashUFVK(GetCurrentAccountIndex(), ufvk);
 
         result = generate_zcash_default_address(ufvk);
+    } else if (g_chainCard == HOME_WALLET_CARD_DCR) {
+        snprintf_s(hdPath, BUFFER_SIZE_128, "m/44'/42'/0'/0/%u", index);
+        result = dcr_get_address(GetCurrentAccountPublicKey(XPUB_TYPE_DCR), index);
     }
 #endif
 
 #ifdef WEB3_VERSION
     char *xPub = NULL;
     switch (g_chainCard) {
+    case HOME_WALLET_CARD_DCR:
+        xPub = GetCurrentAccountPublicKey(XPUB_TYPE_DCR);
+        snprintf_s(hdPath, BUFFER_SIZE_128, "m/44'/42'/0'/0/%u", index);
+        result = dcr_get_address(xPub, index);
+        break;
     case HOME_WALLET_CARD_TRX:
         xPub = GetCurrentAccountPublicKey(XPUB_TYPE_TRX);
         snprintf_s(hdPath, BUFFER_SIZE_128, "m/44'/195'/0'/0/%u", index);

@@ -45,6 +45,8 @@ fn main() {
         v.push_str("#define FEATURE_COSMOS\n");
         #[cfg(feature = "dash")]
         v.push_str("#define FEATURE_DASH\n");
+        #[cfg(feature = "decred")]
+        v.push_str("#define FEATURE_DECRED\n");
         #[cfg(feature = "ethereum")]
         v.push_str("#define FEATURE_ETHEREUM\n");
         #[cfg(feature = "ltc")]

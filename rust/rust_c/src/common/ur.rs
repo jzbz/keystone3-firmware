@@ -75,6 +75,8 @@ use ur_registry::tron::tron_sign_request::TronSignRequest;
 use ur_registry::zcash::zcash_pczt::ZcashPczt;
 #[cfg(feature = "zcash_cypherpunk")]
 use ur_registry::zcash::zcash_sign_batch::ZcashSignBatch;
+#[cfg(feature = "decred")]
+use ur_registry::decred::dcr_sign_request::DcrSignRequest;
 
 use super::errors::{ErrorCodes, RustCError};
 use super::free::Free;
@@ -300,6 +302,8 @@ pub enum ViewType {
     ZcashTx,
     #[cfg(feature = "zcash_cypherpunk")]
     ZcashBatchTx,
+    #[cfg(feature = "decred")]
+    DcrTx,
     #[cfg(feature = "aptos")]
     AptosTx,
     #[cfg(feature = "monero")]
@@ -390,6 +394,8 @@ pub enum QRCodeType {
     ZcashPczt,
     #[cfg(feature = "zcash_cypherpunk")]
     ZcashSignBatch,
+    #[cfg(feature = "decred")]
+    DcrSignRequest,
     #[cfg(feature = "monero")]
     XmrOutputSignRequest,
     #[cfg(feature = "monero")]
@@ -460,6 +466,8 @@ impl QRCodeType {
             InnerURType::ZcashPczt(_) => Ok(QRCodeType::ZcashPczt),
             #[cfg(feature = "zcash_cypherpunk")]
             InnerURType::ZcashSignBatch(_) => Ok(QRCodeType::ZcashSignBatch),
+            #[cfg(feature = "decred")]
+            InnerURType::DcrSignRequest(_) => Ok(QRCodeType::DcrSignRequest),
             #[cfg(feature = "monero")]
             InnerURType::XmrTxUnsigned(_) => Ok(QRCodeType::XmrTxUnsignedRequest),
             #[cfg(feature = "monero")]
@@ -648,6 +656,10 @@ unsafe fn free_ur(ur_type: &QRCodeType, data: PtrUR) {
         #[cfg(not(feature = "btc-only"))]
         QRCodeType::QRHardwareCall => {
             free_ptr_with_type!(data, QRHardwareCall);
+        }
+        #[cfg(feature = "decred")]
+        QRCodeType::DcrSignRequest => {
+            free_ptr_with_type!(data, DcrSignRequest);
         }
         _ => {}
     }
@@ -890,6 +902,8 @@ pub fn decode_ur(ur: String) -> URParseResult {
         QRCodeType::ZcashPczt => _decode_ur::<ZcashPczt>(ur, ur_type),
         #[cfg(feature = "zcash_cypherpunk")]
         QRCodeType::ZcashSignBatch => _decode_ur::<ZcashSignBatch>(ur, ur_type),
+        #[cfg(feature = "decred")]
+        QRCodeType::DcrSignRequest => _decode_ur::<DcrSignRequest>(ur, ur_type),
         #[cfg(feature = "monero")]
         QRCodeType::XmrOutputSignRequest => _decode_ur::<XmrOutput>(ur, ur_type),
         #[cfg(feature = "monero")]
@@ -1004,6 +1018,8 @@ fn receive_ur(ur: String, decoder: &mut KeystoneURDecoder) -> URParseMultiResult
         QRCodeType::ZcashPczt => _receive_ur::<ZcashPczt>(ur, ur_type, decoder),
         #[cfg(feature = "zcash_cypherpunk")]
         QRCodeType::ZcashSignBatch => _receive_ur::<ZcashSignBatch>(ur, ur_type, decoder),
+        #[cfg(feature = "decred")]
+        QRCodeType::DcrSignRequest => _receive_ur::<DcrSignRequest>(ur, ur_type, decoder),
         #[cfg(feature = "monero")]
         QRCodeType::XmrOutputSignRequest => _receive_ur::<XmrOutput>(ur, ur_type, decoder),
         #[cfg(feature = "monero")]

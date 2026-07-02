@@ -44,6 +44,9 @@ mod cardano;
 #[cfg(feature = "cosmos")]
 #[allow(unused)]
 mod cosmos;
+#[cfg(feature = "decred")]
+#[allow(unused)]
+mod decred;
 #[cfg(feature = "ethereum")]
 #[allow(unused)]
 mod ethereum;
