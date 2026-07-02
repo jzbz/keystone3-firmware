@@ -29,6 +29,7 @@ static void GuiCreateQrCodePrivateModeWidget(lv_obj_t *parent);
 static void CancelAttentionHandler(lv_event_t *e);
 static void CloseAttentionHandler(lv_event_t *e);
 static void AddCakeCoins(void);
+static void AddDcrCoins(void);
 
 #define DERIVATION_PATH_EG_LEN 2
 #define HIDDEN_PINCODE "* * * * * *"
@@ -75,6 +76,10 @@ static const lv_img_dsc_t *g_zodlCoinArray[1] = {
     &coinZec,
 };
 
+static const lv_img_dsc_t *g_dcrCoinArray[1] = {
+    &coinDcr,
+};
+
 WalletListItem_t g_walletListArray[] = {
     {WALLET_LIST_BLUE, &walletBluewallet, "BlueWallet", g_blueWalletCoinArray, 1, true},
     {WALLET_LIST_SPARROW, &walletSparrow, "Sparrow", g_blueWalletCoinArray, 1, true},
@@ -85,6 +90,7 @@ WalletListItem_t g_walletListArray[] = {
     {WALLET_LIST_ZODL, &walletZodl, "Zodl", g_zodlCoinArray, 1, true},
     {WALLET_LIST_BULL, &walletBull, "BULL", g_blueWalletCoinArray, 1, true},
     {WALLET_LIST_VIZOR, &walletVizor, "Vizor", g_zodlCoinArray, 1, true},
+    {WALLET_LIST_DECRED, &walletDecred, "Decred", g_dcrCoinArray, 1, true},
 };
 
 typedef struct {
@@ -310,6 +316,18 @@ static void AddZecCoins(void)
     }
 }
 
+static void AddDcrCoins(void)
+{
+    if (lv_obj_get_child_cnt(g_coinCont) > 0) {
+        lv_obj_clean(g_coinCont);
+    }
+
+    lv_obj_t *img = GuiCreateImg(g_coinCont, g_dcrCoinArray[0]);
+    lv_img_set_zoom(img, 110);
+    lv_img_set_pivot(img, 0, 0);
+    lv_obj_align(img, LV_ALIGN_TOP_LEFT, 0, 0);
+}
+
 static void AddCakeCoins(void)
 {
     if (lv_obj_get_child_cnt(g_coinCont) > 0) {
@@ -387,6 +405,10 @@ void GuiConnectWalletSetQrdata(WALLET_LIST_INDEX_ENUM index)
     case WALLET_LIST_FEATHER:
         func = GuiGetCakeData;
         AddCakeCoins();
+        break;
+    case WALLET_LIST_DECRED:
+        func = GuiGetDcrData;
+        AddDcrCoins();
         break;
     case WALLET_LIST_UNISAT:
         func = GuiGetStandardBtcData;

@@ -194,6 +194,13 @@
         GuiGetZcashGUIData, \
         NULL, \
         FreeZcashMemory, \
+    }, \
+    { \
+        REMAPVIEW_DCR, \
+        "{\"name\":\"dcr_page\",\"type\":\"custom_container\",\"pos\":[36,0],\"size\":[408,900],\"bg_color\":0,\"custom_show_func\":\"GuiDcrTxOverview\"}", \
+        GuiGetDcrGUIData, \
+        NULL, \
+        FreeDcrMemory, \
     }
 #endif
 #endif

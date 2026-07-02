@@ -3,10 +3,12 @@
 #define _GUI_CYPHERPUNK_HOME_WIDGETS_H
 
 #define HOME_WIDGETS_SURPLUS_CARD_ENUM     HOME_WALLET_CARD_ZEC, \
-    HOME_WALLET_CARD_MONERO
+    HOME_WALLET_CARD_MONERO, \
+    HOME_WALLET_CARD_DCR
 
 #define HOME_WALLET_STATE_SURPLUS          {HOME_WALLET_CARD_ZEC, true, "ZEC", true}, \
-    {HOME_WALLET_CARD_MONERO, true, "XMR", true}
+    {HOME_WALLET_CARD_MONERO, true, "XMR", true}, \
+    {HOME_WALLET_CARD_DCR, true, "DCR", true}
 
 #define HOME_WALLET_CARD_SURPLUS           { \
         .index = HOME_WALLET_CARD_ZEC, \
@@ -19,6 +21,12 @@
         .coin = "XMR", \
         .chain = "Monero", \
         .icon = &coinXmr, \
+    }, \
+    { \
+        .index = HOME_WALLET_CARD_DCR, \
+        .coin = "DCR", \
+        .chain = "Decred", \
+        .icon = &coinDcr, \
     }
 
 #endif /* _GUI_CYPHERPUNK_HOME_WIDGETS_H */

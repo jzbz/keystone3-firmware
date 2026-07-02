@@ -1,0 +1,15 @@
+[package]
+name = "app_decred"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitcoin = { workspace = true }
+thiserror = { workspace = true }
+hex = { workspace = true }
+bs58 = { version = "0.5.1", default-features = false, features = ["alloc"] }
+# Pinned to the same minicbor line the KeyOS decred-core airgap format was
+# written against, so the derived CBOR layout stays byte-identical.
+minicbor = { version = "0.24", features = ["alloc", "derive"] }

@@ -67,6 +67,8 @@ use ur_registry::ton::ton_sign_request::{DataType, TonSignRequest};
 use ur_registry::tron::tron_sign_request::TronSignRequest;
 #[cfg(feature = "zcash")]
 use ur_registry::zcash::zcash_pczt::ZcashPczt;
+#[cfg(feature = "decred")]
+use ur_registry::decred::dcr_sign_request::DcrSignRequest;
 
 use super::ur::ViewType;
 
@@ -220,6 +222,13 @@ impl InferViewType for AptosSignRequest {
 impl InferViewType for ZcashPczt {
     fn infer(&self) -> Result<ViewType, URError> {
         Ok(ViewType::ZcashTx)
+    }
+}
+
+#[cfg(feature = "decred")]
+impl InferViewType for DcrSignRequest {
+    fn infer(&self) -> Result<ViewType, URError> {
+        Ok(ViewType::DcrTx)
     }
 }
 

@@ -238,6 +238,7 @@ LV_IMG_DECLARE(coinRune);
 LV_IMG_DECLARE(coinHelium);
 LV_IMG_DECLARE(coinNtrn);
 LV_IMG_DECLARE(coinZec);
+LV_IMG_DECLARE(coinDcr);
 LV_IMG_DECLARE(coinDoge);
 LV_IMG_DECLARE(coinBabylon);
 LV_IMG_DECLARE(coinNeutaro)
@@ -285,6 +286,7 @@ LV_IMG_DECLARE(walletHelium);
 LV_IMG_DECLARE(walletSuiet);
 LV_IMG_DECLARE(walletZeus);
 LV_IMG_DECLARE(walletZodl);
+LV_IMG_DECLARE(walletDecred);
 LV_IMG_DECLARE(walletFeather);
 LV_IMG_DECLARE(walletCore);
 LV_IMG_DECLARE(walletBabylon);
