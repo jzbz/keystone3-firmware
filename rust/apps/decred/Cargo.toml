@@ -6,10 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# All Decred consensus logic — BLAKE-256, addresses, BIP32 with dprv/dpub
+# serialization, the tx wire format, sighash, ECDSA signature scripts and the
+# air-gapped CBOR package — lives in the shared dcr-rs library, where it is
+# pinned by dcrd reference vectors and a real mainnet transaction. This crate
+# is only the firmware adapter. Pinned by rev for reproducible builds.
+dcr-rs = { git = "https://github.com/jzbz/dcr-rs", rev = "9f3902adc3ee5a1962a479d8bece3028be81fef9", default-features = false, features = ["airgap"] }
+# Only used to parse the account-level `xpub…` string the firmware stores
+# (standard BIP32 encoding; see account_public_info.c). bitcoin 0.32 and
+# dcr-rs both resolve to secp256k1 0.29, so key types unify.
 bitcoin = { workspace = true }
 thiserror = { workspace = true }
+
+[dev-dependencies]
 hex = { workspace = true }
-bs58 = { version = "0.5.1", default-features = false, features = ["alloc"] }
-# Pinned to the same minicbor line the KeyOS decred-core airgap format was
-# written against, so the derived CBOR layout stays byte-identical.
-minicbor = { version = "0.24", features = ["alloc", "derive"] }

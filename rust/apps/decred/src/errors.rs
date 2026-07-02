@@ -1,4 +1,4 @@
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use thiserror;
 use thiserror::Error;
 
@@ -18,4 +18,23 @@ pub enum DecredError {
     SigHashIndex,
     #[error("input script does not match the wallet key (refusing to sign)")]
     ScriptMismatch,
+}
+
+/// Map dcr-rs errors onto the firmware error variants (which in turn map onto
+/// C error codes in rust_c/src/common/errors.rs). The security-relevant
+/// variants pass through one-to-one so the UI can show the precise refusal.
+impl From<dcr_rs::Error> for DecredError {
+    fn from(e: dcr_rs::Error) -> Self {
+        match e {
+            dcr_rs::Error::UnsupportedVersion => DecredError::UnsupportedVersion,
+            dcr_rs::Error::SigHashIndex => DecredError::SigHashIndex,
+            dcr_rs::Error::ScriptMismatch => DecredError::ScriptMismatch,
+            dcr_rs::Error::Derivation | dcr_rs::Error::HardenedFromPublic => {
+                DecredError::GenerateAddressError(e.to_string())
+            }
+            // Parse/Base58/BadChecksum/UnknownPrefix/Encode/InvalidRequest and
+            // any future variants (dcr_rs::Error is non_exhaustive).
+            other => DecredError::InvalidDataError(other.to_string()),
+        }
+    }
 }

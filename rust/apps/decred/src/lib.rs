@@ -1,60 +1,59 @@
-//! Decred (DCR) support for Keystone: a no_std signing core ported from the
-//! KeyOS `decred-core` crate.
+//! Decred (DCR) support for Keystone: a thin firmware adapter over the shared
+//! [`dcr-rs`](https://github.com/jzbz/dcr-rs) library.
 //!
-//! Scope is deliberately narrow: account xpub → P2PKH addresses → SigHashAll →
-//! low-S ECDSA. No staking, no mixing, no transaction *construction* policy
-//! (the watch-only companion does that). This crate only turns an unsigned-tx
-//! package into a signed, network-serializable tx, plus the address/dpub
-//! helpers the firmware UI needs.
+//! All consensus-critical logic — BLAKE-256, addresses, BIP32 with Decred
+//! serialization, the tx wire format, the sighash, ECDSA signature scripts and
+//! the air-gapped CBOR package (shared with the KeyOS signer) — lives in
+//! dcr-rs, where it is pinned by dcrd reference vectors and a real mainnet
+//! transaction. This crate only:
+//!   * bridges the firmware's stored account `xpub…` string (standard BIP32
+//!     encoding, see `account_public_info.c`) to a dcr-rs [`ExtPubKey`],
+//!   * pre-formats amounts/addresses into the review-screen structs, and
+//!   * maps errors onto the firmware error codes (see `errors.rs`).
 //!
-//! EC math and BIP32 are delegated to the same `bitcoin` crate the rest of the
-//! firmware uses. The only Decred-specific cryptographic primitive vendored
-//! here is BLAKE-256 (the 14-round SHA-3 finalist Decred uses for
-//! *everything*, not BLAKE2/3), implemented in `blake256.rs` and checked
-//! against dcrd KATs. Every algorithm was written against dcrd source and is
-//! exercised by reference vectors lifted from dcrd plus a real mainnet
-//! transaction in `tests/`.
+//! Trust model is unchanged: all display classification is done by the device
+//! itself from the account xpub, and signing re-derives every input key — the
+//! companion's claims are only used for the `flagged` tamper warnings.
 
 #![no_std]
 
 extern crate alloc;
 
-pub mod address;
-pub mod airgap;
-pub mod blake256;
 pub mod errors;
-pub mod hashing;
-pub mod hd;
-pub mod sighash;
-pub mod sign;
-pub mod tx;
 
-use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use core::str::FromStr;
 
-use bitcoin::secp256k1::Secp256k1;
+use bitcoin::bip32::Xpub;
+use dcr_rs::hd::{ExtPrivKey, ExtPubKey};
+use dcr_rs::secp256k1::Secp256k1;
+use dcr_rs::{airgap, Address, Network};
 
-use crate::airgap::{decode_sign_request, sign_request};
-use crate::errors::Result;
-use crate::hd::{parse_account_xpub, pubkey_from_xpub};
+use crate::errors::{DecredError, Result};
 
-const ATOMS_PER_DCR: i64 = 100_000_000;
+pub use dcr_rs::format_amount;
 
-/// Format an atom amount for display: `"1.2345 DCR"`, trailing zeros trimmed.
-pub fn format_amount(atoms: i64) -> String {
-    let sign = if atoms < 0 { "-" } else { "" };
-    let abs = atoms.unsigned_abs();
-    let whole = abs / ATOMS_PER_DCR as u64;
-    let frac = abs % ATOMS_PER_DCR as u64;
-    if frac == 0 {
-        return format!("{}{} DCR", sign, whole);
-    }
-    let mut frac_str = format!("{:08}", frac);
-    while frac_str.ends_with('0') {
-        frac_str.pop();
-    }
-    format!("{}{}.{} DCR", sign, whole, frac_str)
+/// Branch constants shared with the companion protocol.
+pub mod hd {
+    pub use dcr_rs::hd::{BRANCH_EXTERNAL, BRANCH_INTERNAL};
+}
+
+/// Parse the stored account-level `xpub…` string into a mainnet dcr-rs key.
+/// The firmware stores the standard BIP32 form (double-SHA256 checksum); only
+/// the version bytes and checksum differ from Decred's `dpub` encoding — the
+/// 74-byte key body is identical, so the fields carry over one-to-one.
+fn account_from_xpub(xpub: &str) -> Result<ExtPubKey> {
+    let key = Xpub::from_str(xpub.trim())
+        .map_err(|e| DecredError::GenerateAddressError(e.to_string()))?;
+    Ok(ExtPubKey {
+        network: Network::Mainnet,
+        public_key: key.public_key,
+        chain_code: key.chain_code.to_bytes(),
+        depth: key.depth,
+        parent_fingerprint: key.parent_fingerprint.to_bytes(),
+        child_number: u32::from(key.child_number),
+    })
 }
 
 /// One display row of the transaction review screen.
@@ -85,16 +84,16 @@ pub struct ParsedDcrTx {
 /// Decode + trustlessly classify a `dcr-sign-request` payload for review.
 pub fn parse_sign_request(payload: &[u8], account_xpub: &str) -> Result<ParsedDcrTx> {
     let secp = Secp256k1::new();
-    let req = decode_sign_request(payload)?;
-    let summary = req.review_owned(&secp, account_xpub)?;
+    let req = airgap::decode_sign_request(payload)?;
+    let account = account_from_xpub(account_xpub)?;
+    let summary = req.review_owned(&secp, &account)?;
 
     // Inputs are all ours (enforced by check_sign_request before signing);
     // show the spending addresses so the user can cross-check.
-    let account = parse_account_xpub(account_xpub)?;
     let mut from = Vec::new();
     for input in &req.inputs {
-        let address = match pubkey_from_xpub(&secp, &account, input.branch, input.index) {
-            Ok(pubkey) => address::p2pkh_from_pubkey(&pubkey),
+        let address = match account.pubkey_at(&secp, input.branch, input.index) {
+            Ok(pubkey) => Address::from_pubkey(&pubkey, Network::Mainnet).encode(),
             Err(_) => "<unknown input>".to_string(),
         };
         from.push(DisplayItem {
@@ -130,41 +129,30 @@ pub fn parse_sign_request(payload: &[u8], account_xpub: &str) -> Result<ParsedDc
 /// ownership (prev_script must re-derive from our xpub), amount sanity.
 pub fn check_sign_request(payload: &[u8], account_xpub: &str) -> Result<()> {
     let secp = Secp256k1::new();
-    let req = decode_sign_request(payload)?;
-    req.check_owned_inputs(&secp, account_xpub)
+    let req = airgap::decode_sign_request(payload)?;
+    let account = account_from_xpub(account_xpub)?;
+    Ok(req.check_owned_inputs(&secp, &account)?)
 }
 
 /// Sign a `dcr-sign-request` payload with the wallet seed and return the
 /// broadcast-ready full transaction bytes for the `dcr-signed-tx` reply.
 pub fn sign_sign_request(payload: &[u8], seed: &[u8]) -> Result<Vec<u8>> {
     let secp = Secp256k1::new();
-    let req = decode_sign_request(payload)?;
-    sign_request(&secp, seed, &req)
+    let req = airgap::decode_sign_request(payload)?;
+    let master = ExtPrivKey::master_from_seed(seed, Network::Mainnet)
+        .map_err(|_| DecredError::SigningError("invalid seed".to_string()))?;
+    Ok(airgap::sign_request(&secp, &master, &req)?)
 }
 
 /// Receive address at `branch/index` below the stored account xpub.
 pub fn get_address(account_xpub: &str, branch: u32, index: u32) -> Result<String> {
     let secp = Secp256k1::new();
-    let account = parse_account_xpub(account_xpub)?;
-    let pubkey = pubkey_from_xpub(&secp, &account, branch, index)?;
-    Ok(address::p2pkh_from_pubkey(&pubkey))
+    let account = account_from_xpub(account_xpub)?;
+    let pubkey = account.pubkey_at(&secp, branch, index)?;
+    Ok(Address::from_pubkey(&pubkey, Network::Mainnet).encode())
 }
 
 /// The `dpub…` export a watch-only Decred companion imports.
 pub fn get_dpub(account_xpub: &str) -> Result<String> {
-    hd::xpub_to_dpub(account_xpub)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn amount_formatting() {
-        assert_eq!(format_amount(0), "0 DCR");
-        assert_eq!(format_amount(100_000_000), "1 DCR");
-        assert_eq!(format_amount(123_456_789), "1.23456789 DCR");
-        assert_eq!(format_amount(120_000_000), "1.2 DCR");
-        assert_eq!(format_amount(-50_000_000), "-0.5 DCR");
-    }
+    Ok(account_from_xpub(account_xpub)?.to_base58())
 }
