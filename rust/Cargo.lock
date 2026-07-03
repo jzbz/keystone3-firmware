@@ -1545,7 +1545,7 @@ dependencies = [
 [[package]]
 name = "dcr-rs"
 version = "0.1.0"
-source = "git+https://github.com/jzbz/dcr-rs?rev=9f3902adc3ee5a1962a479d8bece3028be81fef9#9f3902adc3ee5a1962a479d8bece3028be81fef9"
+source = "git+https://github.com/jzbz/dcr-rs?rev=c8d25078ba07f9fe01f9718d2ee2195906f7c5b2#c8d25078ba07f9fe01f9718d2ee2195906f7c5b2"
 dependencies = [
  "bs58",
  "hmac 0.12.1",
