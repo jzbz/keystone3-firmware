@@ -36,6 +36,9 @@ sign-request-package = [
     expiry: uint,
     inputs: [+ input-meta],
     outputs: [+ output-meta],
+    ? account_fp: [4*4 uint],  ; OPTIONAL: BIP32 fingerprint of the account the
+                               ; request was built against (first 4 bytes of
+                               ; hash160 of the account's compressed pubkey)
 ]
 
 input-meta = [
@@ -62,6 +65,11 @@ The package is untrusted input: Keystone re-derives every input's key from
 `branch`/`index` and refuses to sign unless the claimed `prev_script` matches,
 and it re-classifies every output itself (change vs recipient) instead of
 believing `is_change`. A mislabelled output is surfaced as a tamper warning.
+If the optional `account_fp` is present and does not match the device's
+account, the request is refused up front with a "different wallet or account"
+message — a courtesy check only; the `prev_script` re-derivation remains the
+fund protector. Packages without the field (the original 7-element layout)
+remain fully supported.
 
 ### CDDL for Decred Signed Transaction
 

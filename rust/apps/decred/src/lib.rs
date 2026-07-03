@@ -81,11 +81,32 @@ pub struct ParsedDcrTx {
     pub flagged: Vec<DisplayItem>,
 }
 
+/// If the companion stamped the request with the fingerprint of the account
+/// it was built against, refuse with a friendly message when it isn't ours —
+/// long before the prev_script check would fail with a bare mismatch. Never a
+/// security control (the script re-derivation remains the fund protector).
+fn check_account_fp(req: &airgap::SignRequest, account: &ExtPubKey) -> Result<()> {
+    if let Some(fp) = req.account_fp {
+        if account.fingerprint() != fp {
+            return Err(DecredError::InvalidDataError(
+                "this transaction was built for a different wallet or account".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Decode + trustlessly classify a `dcr-sign-request` payload for review.
 pub fn parse_sign_request(payload: &[u8], account_xpub: &str) -> Result<ParsedDcrTx> {
     let secp = Secp256k1::new();
     let req = airgap::decode_sign_request(payload)?;
+    // Structural/economic sanity before anything is formatted for display:
+    // the review screen must never render dishonest math (duplicate inputs,
+    // out-of-range or overflowing amounts, negative fees), regardless of
+    // whether the check step already ran.
+    req.validate()?;
     let account = account_from_xpub(account_xpub)?;
+    check_account_fp(&req, &account)?;
     let summary = req.review_owned(&secp, &account)?;
 
     // Inputs are all ours (enforced by check_sign_request before signing);
@@ -131,6 +152,9 @@ pub fn check_sign_request(payload: &[u8], account_xpub: &str) -> Result<()> {
     let secp = Secp256k1::new();
     let req = airgap::decode_sign_request(payload)?;
     let account = account_from_xpub(account_xpub)?;
+    check_account_fp(&req, &account)?;
+    // Runs validate() first (structural/economic sanity), then re-derives
+    // every input's script from our xpub.
     Ok(req.check_owned_inputs(&secp, &account)?)
 }
 

@@ -104,6 +104,7 @@ fn request_for(xpub: &str) -> (SignRequest, Vec<u8>) {
                 is_change: true,
             },
         ],
+        account_fp: None,
     };
     (req, script0)
 }
@@ -163,6 +164,61 @@ fn tampered_prev_script_is_refused_everywhere() {
         app_decred::sign_sign_request(&payload, &seed),
         Err(DecredError::ScriptMismatch)
     );
+}
+
+#[test]
+fn account_fingerprint_gates_wrong_wallet() {
+    let secp = Secp256k1::new();
+    let seed = hex::decode("000102030405060708090a0b0c0d0e0f").unwrap();
+    let xpub = firmware_account_xpub(&secp, &seed);
+    let account = ExtPubKey::from_base58(&app_decred::get_dpub(&xpub).unwrap()).unwrap();
+    let (mut req, _) = request_for(&xpub);
+
+    // The right fingerprint (and no fingerprint at all) sails through.
+    req.account_fp = Some(account.fingerprint());
+    let payload = encode_sign_request(&req).unwrap();
+    app_decred::check_sign_request(&payload, &xpub).unwrap();
+    app_decred::parse_sign_request(&payload, &xpub).unwrap();
+
+    // A request built against a different wallet/account is refused with the
+    // friendly message before any script mismatch could fire.
+    req.account_fp = Some([0xde, 0xad, 0xbe, 0xef]);
+    let payload = encode_sign_request(&req).unwrap();
+    assert!(matches!(
+        app_decred::check_sign_request(&payload, &xpub),
+        Err(DecredError::InvalidDataError(_))
+    ));
+    assert!(matches!(
+        app_decred::parse_sign_request(&payload, &xpub),
+        Err(DecredError::InvalidDataError(_))
+    ));
+}
+
+#[test]
+fn duplicate_inputs_are_refused_before_display() {
+    let secp = Secp256k1::new();
+    let seed = hex::decode("000102030405060708090a0b0c0d0e0f").unwrap();
+    let xpub = firmware_account_xpub(&secp, &seed);
+    let (mut req, _) = request_for(&xpub);
+
+    // The same coin listed twice inflates the apparent input total and
+    // understates the displayed fee — both the check and the parse (display)
+    // paths must refuse it.
+    let dup = req.inputs[0].clone();
+    req.inputs.push(dup);
+    let payload = encode_sign_request(&req).unwrap();
+    assert!(matches!(
+        app_decred::check_sign_request(&payload, &xpub),
+        Err(DecredError::InvalidDataError(_))
+    ));
+    assert!(matches!(
+        app_decred::parse_sign_request(&payload, &xpub),
+        Err(DecredError::InvalidDataError(_))
+    ));
+    assert!(matches!(
+        app_decred::sign_sign_request(&payload, &seed),
+        Err(DecredError::InvalidDataError(_))
+    ));
 }
 
 #[test]
