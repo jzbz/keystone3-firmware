@@ -249,6 +249,37 @@ fn account_fingerprint_gates_wrong_wallet() {
     ));
 }
 
+/// lock_time and expiry must reach the review screen when set, and be omitted when
+/// zero.
+///
+/// Both are attacker-controlled and both are committed by the signature, but
+/// neither could previously cross into the display structs at all. Expiry is the
+/// one that matters: past that height the transaction is permanently invalid, so a
+/// companion could hand over a package that reviewed perfectly and then never
+/// confirmed, with nothing on the device to explain it.
+#[test]
+fn lock_time_and_expiry_reach_the_review_screen() {
+    let secp = Secp256k1::new();
+    let seed = hex::decode("000102030405060708090a0b0c0d0e0f").unwrap();
+    let xpub = firmware_account_xpub(&secp, &seed);
+
+    // Absent when zero, so the ordinary transaction shows no zero rows.
+    let (req, _) = request_for(&xpub);
+    let payload = encode_sign_request(&req).unwrap();
+    let parsed = app_decred::parse_sign_request(&payload, &xpub).unwrap();
+    assert_eq!(parsed.lock_time, None);
+    assert_eq!(parsed.expiry, None);
+
+    // Present, and rendered as decimal, when set.
+    let (mut req, _) = request_for(&xpub);
+    req.lock_time = 424_242;
+    req.expiry = 999_001;
+    let payload = encode_sign_request(&req).unwrap();
+    let parsed = app_decred::parse_sign_request(&payload, &xpub).unwrap();
+    assert_eq!(parsed.lock_time.as_deref(), Some("424242"));
+    assert_eq!(parsed.expiry.as_deref(), Some("999001"));
+}
+
 /// A request naming a different BIP44 account must be refused up front, not after
 /// the user has entered their password.
 ///

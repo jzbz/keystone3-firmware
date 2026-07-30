@@ -96,6 +96,19 @@ void GuiDcrTxOverview(lv_obj_t *parent, void *totalData)
     last_view = CreateTransactionItemView(container, _("Amount"), g_dcrData->total_send_value, last_view);
     last_view = CreateTransactionItemView(container, _("Fee"), g_dcrData->fee_value, last_view);
 
+    // Shown only when set, so the usual transaction does not carry two rows of
+    // zeroes the user learns to skip. Expiry in particular has no Bitcoin analogue:
+    // past that height the transaction is permanently invalid, so a companion can
+    // hand over something that reviews perfectly and then never confirms. Both
+    // fields are attacker-controlled and are committed by the signature, so the
+    // device must not sign them out of sight.
+    if (g_dcrData->lock_time != NULL) {
+        last_view = CreateTransactionItemView(container, _("Lock Time"), g_dcrData->lock_time, last_view);
+    }
+    if (g_dcrData->expiry != NULL) {
+        last_view = CreateTransactionItemView(container, _("Expiry"), g_dcrData->expiry, last_view);
+    }
+
     if (g_dcrData->from != NULL && g_dcrData->from->size > 0) {
         last_view = GuiDcrTxItemList(container, _("From"), g_dcrData->from, NULL, last_view);
     }

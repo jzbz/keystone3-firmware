@@ -5,6 +5,7 @@ use crate::common::{
     utils::convert_c_char,
 };
 use crate::{free_str_ptr, free_vec, impl_c_ptr, impl_c_ptrs};
+use alloc::string::String;
 use alloc::vec::Vec;
 use app_decred::{DisplayItem, ParsedDcrTx};
 use cstr_core;
@@ -19,12 +20,26 @@ pub struct DisplayDcrTx {
     pub from: Ptr<VecFFI<DisplayDcrTxItem>>,
     pub to: Ptr<VecFFI<DisplayDcrTxItem>>,
     pub change: Ptr<VecFFI<DisplayDcrTxItem>>,
+    /// Lock time as a decimal string, or NULL when zero. The C side must check for
+    /// NULL and omit the row.
+    pub lock_time: PtrString,
+    /// Expiry height as a decimal string, or NULL when zero. See
+    /// `ParsedDcrTx::expiry` for why this is worth showing.
+    pub expiry: PtrString,
 }
 
 impl From<&ParsedDcrTx> for DisplayDcrTx {
     fn from(tx: &ParsedDcrTx) -> Self {
         let items = |v: &Vec<DisplayItem>| -> Ptr<VecFFI<DisplayDcrTxItem>> {
             VecFFI::from(v.iter().map(DisplayDcrTxItem::from).collect::<Vec<_>>()).c_ptr()
+        };
+        // An absent field crosses as NULL rather than an empty string, so the C side
+        // can omit the row with a plain NULL check. free_str_ptr! is NULL-tolerant.
+        let opt_str = |v: &Option<String>| -> PtrString {
+            match v {
+                Some(s) => convert_c_char(s.clone()),
+                None => core::ptr::null_mut(),
+            }
         };
         Self {
             network: convert_c_char(tx.network.clone()),
@@ -35,6 +50,8 @@ impl From<&ParsedDcrTx> for DisplayDcrTx {
             from: items(&tx.from),
             to: items(&tx.to),
             change: items(&tx.change),
+            lock_time: opt_str(&tx.lock_time),
+            expiry: opt_str(&tx.expiry),
         }
     }
 }
@@ -49,6 +66,8 @@ impl Free for DisplayDcrTx {
         free_vec!(self.from);
         free_vec!(self.to);
         free_vec!(self.change);
+        free_str_ptr!(self.lock_time);
+        free_str_ptr!(self.expiry);
     }
 }
 

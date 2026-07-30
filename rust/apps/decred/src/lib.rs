@@ -127,6 +127,20 @@ pub struct ParsedDcrTx {
     pub from: Vec<DisplayItem>,
     pub to: Vec<DisplayItem>,
     pub change: Vec<DisplayItem>,
+    /// Transaction lock time, as a decimal string, or `None` when zero.
+    ///
+    /// `Some` only when non-zero so the review screen can omit the row entirely in
+    /// the overwhelmingly common case, rather than showing every user a "0" they
+    /// have to learn to ignore.
+    pub lock_time: Option<String>,
+    /// Transaction expiry height, as a decimal string, or `None` when zero.
+    ///
+    /// Decred-specific and worth surfacing: past this height the transaction
+    /// becomes permanently invalid. A companion that sets `expiry` to the next
+    /// block produces a review screen that looks entirely normal and a transaction
+    /// that silently never confirms — repeatable indefinitely as a way to waste a
+    /// user's time. It cannot steal anything, but the device should not hide it.
+    pub expiry: Option<String>,
 }
 // NOTE: the `flagged` list is gone along with dcr-rs's `flagged_mismatches`. It
 // held outputs the companion called change that the old address scan could not
@@ -195,7 +209,19 @@ pub fn parse_sign_request(payload: &[u8], account_xpub: &str) -> Result<ParsedDc
         from,
         to: items(summary.recipients),
         change: items(summary.change),
+        lock_time: non_zero(req.lock_time),
+        expiry: non_zero(req.expiry),
     })
+}
+
+/// Render a height/time field for display, or `None` when it is zero and carries
+/// no meaning.
+fn non_zero(v: u32) -> Option<String> {
+    if v == 0 {
+        None
+    } else {
+        Some(alloc::format!("{v}"))
+    }
 }
 
 /// Pre-sign validation of a `dcr-sign-request` payload: format version, input
