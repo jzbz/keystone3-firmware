@@ -19,9 +19,6 @@ pub struct DisplayDcrTx {
     pub from: Ptr<VecFFI<DisplayDcrTxItem>>,
     pub to: Ptr<VecFFI<DisplayDcrTxItem>>,
     pub change: Ptr<VecFFI<DisplayDcrTxItem>>,
-    /// Outputs the companion mislabelled as change but the device cannot
-    /// derive as its own — evidence of a faulty or hostile companion.
-    pub flagged: Ptr<VecFFI<DisplayDcrTxItem>>,
 }
 
 impl From<&ParsedDcrTx> for DisplayDcrTx {
@@ -38,7 +35,6 @@ impl From<&ParsedDcrTx> for DisplayDcrTx {
             from: items(&tx.from),
             to: items(&tx.to),
             change: items(&tx.change),
-            flagged: items(&tx.flagged),
         }
     }
 }
@@ -53,7 +49,6 @@ impl Free for DisplayDcrTx {
         free_vec!(self.from);
         free_vec!(self.to);
         free_vec!(self.change);
-        free_vec!(self.flagged);
     }
 }
 

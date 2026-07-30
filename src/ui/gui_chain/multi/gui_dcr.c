@@ -57,12 +57,13 @@ void GuiDcrTxOverview(lv_obj_t *parent, void *totalData)
 
     lv_obj_t *last_view = NULL;
 
-    if (g_dcrData->flagged != NULL && g_dcrData->flagged->size > 0) {
-        last_view = CreateTransactionItemView(container, _("Warning"),
-                                              _("The connected wallet labelled outputs as change that do NOT belong to this wallet. It may be compromised. Reject this transaction unless you know exactly why this happened."),
-                                              last_view);
-        last_view = GuiDcrTxItemList(container, _("Warning"), g_dcrData->flagged, "Not yours", last_view);
-    }
+    // The mislabelled-change warning that used to open this screen is gone. It
+    // fired when the companion called an output change and the old bounded address
+    // scan could not derive it — which also fired for the user's own change beyond
+    // the scan window. Under the version 2 package format an output is change only
+    // if a supplied derivation path produces its script, and a path that fails to
+    // derive is refused before the review screen is built, so the condition can no
+    // longer occur and there is nothing to warn about here.
 
     last_view = CreateTransactionItemView(container, _("Amount"), g_dcrData->total_send_value, last_view);
     last_view = CreateTransactionItemView(container, _("Fee"), g_dcrData->fee_value, last_view);

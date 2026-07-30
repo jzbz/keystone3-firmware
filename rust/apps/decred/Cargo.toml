@@ -11,7 +11,7 @@ edition = "2021"
 # air-gapped CBOR package — lives in the shared dcr-rs library, where it is
 # pinned by dcrd reference vectors and a real mainnet transaction. This crate
 # is only the firmware adapter. Pinned by rev for reproducible builds.
-dcr-rs = { git = "https://github.com/jzbz/dcr-rs", rev = "fd32c1a16827692c5a751f26a174ae8f3b609899", default-features = false, features = ["airgap"] }
+dcr-rs = { git = "https://github.com/jzbz/dcr-rs", rev = "14b624a5d8b0683e17560a73e29f2b78971c0db0", default-features = false, features = ["airgap"] }
 # Only used to parse the account-level `xpub…` string the firmware stores
 # (standard BIP32 encoding; see account_public_info.c). bitcoin 0.32 and
 # dcr-rs both resolve to secp256k1 0.29, so key types unify.

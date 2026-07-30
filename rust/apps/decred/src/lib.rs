@@ -11,9 +11,11 @@
 //!   * pre-formats amounts/addresses into the review-screen structs, and
 //!   * maps errors onto the firmware error codes (see `errors.rs`).
 //!
-//! Trust model is unchanged: all display classification is done by the device
-//! itself from the account xpub, and signing re-derives every input key — the
-//! companion's claims are only used for the `flagged` tamper warnings.
+//! Trust model, as of dcr-rs format version 2: display classification is done by
+//! the device from the account xpub, signing re-derives every input key, and input
+//! amounts are verified against the funding transaction each input carries rather
+//! than taken on the companion's word. `validate()` performs that verification, so
+//! both the display and the signing paths are covered by it.
 
 #![no_std]
 
@@ -62,9 +64,10 @@ pub struct DisplayItem {
     pub value: String,
 }
 
-/// Everything the review UI needs, pre-formatted. All classification is done
-/// by the device itself from the account xpub — the companion's claims are
-/// only used for the `flagged` tamper warnings.
+/// Everything the review UI needs, pre-formatted. Every figure here is verified
+/// by the device itself: amounts against the funding transaction each input
+/// carries, and change against a derivation the device performs. The companion's
+/// claims are inputs to those checks, never the basis of what is displayed.
 pub struct ParsedDcrTx {
     pub network: String,
     /// Total paid to external recipients (excludes change) — the headline
@@ -76,10 +79,13 @@ pub struct ParsedDcrTx {
     pub from: Vec<DisplayItem>,
     pub to: Vec<DisplayItem>,
     pub change: Vec<DisplayItem>,
-    /// Outputs the companion mislabelled as change but the device cannot
-    /// derive as its own. Non-empty means the companion is faulty or hostile.
-    pub flagged: Vec<DisplayItem>,
 }
+// NOTE: the `flagged` list is gone along with dcr-rs's `flagged_mismatches`. It
+// held outputs the companion called change that the old address scan could not
+// derive — a condition format version 2 makes impossible. An output counts as
+// change only if a supplied derivation path produces its script, and a path that
+// fails to derive is refused before anything reaches the screen. There is no
+// longer a soft warning state to render.
 
 /// If the companion stamped the request with the fingerprint of the account
 /// it was built against, refuse with a friendly message when it isn't ours —
@@ -142,7 +148,6 @@ pub fn parse_sign_request(payload: &[u8], account_xpub: &str) -> Result<ParsedDc
         from,
         to: items(summary.recipients),
         change: items(summary.change),
-        flagged: items(summary.flagged_mismatches),
     })
 }
 
