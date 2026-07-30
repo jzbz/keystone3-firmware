@@ -4863,8 +4863,6 @@ dependencies = [
 [[package]]
 name = "ur-registry"
 version = "1.0.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3e5fdee1510fe809ceaecdf7e3ab75b58b4c578e3f436217cd03132f0596698"
 dependencies = [
  "bs58",
  "hex",
@@ -5721,7 +5719,3 @@ checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
 dependencies = [
  "simd-adler32",
 ]
-
-[[patch.unused]]
-name = "ur-registry"
-version = "1.0.5"

@@ -124,6 +124,12 @@ zeroize = { version = "1.8.2", default-features = false }
 # third party dependencies end
 
 # Vendored with Decred UR registry types (dcr-sign-request / dcr-signed-tx)
-# added on top of the published 1.0.5; see rust/vendor/ur-registry.
+# added on top of the published 1.0.8; see rust/vendor/ur-registry.
+#
+# The vendored version must match the `ur-registry` requirement above. Cargo only
+# warns when a patch version does not match ("patch was not used in the crate
+# graph") and then resolves the published crate instead, which drops the decred
+# module and breaks the build. On any upstream bump, re-vendor rather than
+# leaving this pinned to an older line.
 [patch.crates-io]
 ur-registry = { path = "vendor/ur-registry" }

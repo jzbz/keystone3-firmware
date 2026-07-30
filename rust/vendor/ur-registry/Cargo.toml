@@ -12,7 +12,7 @@
 [package]
 edition = "2024"
 name = "ur-registry"
-version = "1.0.5"
+version = "1.0.8"
 build = false
 autolib = false
 autobins = false
@@ -29,7 +29,10 @@ resolver = "2"
 [features]
 core = ["dep:thiserror-core"]
 default = ["core"]
-std = ["dep:thiserror"]
+std = [
+    "dep:thiserror",
+    "thiserror-core?/std",
+]
 
 [lib]
 name = "ur_registry"
