@@ -8,7 +8,7 @@
 use core::str::FromStr;
 
 use app_decred::errors::DecredError;
-use app_decred::hd::BRANCH_EXTERNAL;
+use app_decred::hd::{BRANCH_EXTERNAL, BRANCH_INTERNAL};
 use bitcoin::bip32::{DerivationPath, Xpriv, Xpub};
 use bitcoin::NetworkKind;
 use dcr_rs::address::p2pkh_script;
@@ -17,7 +17,7 @@ use dcr_rs::hashing::hash160;
 use dcr_rs::hd::ExtPubKey;
 use dcr_rs::secp256k1::{ecdsa::Signature, Message, PublicKey, Secp256k1};
 use dcr_rs::sighash::signature_hash_all;
-use dcr_rs::tx::MsgTx;
+use dcr_rs::tx::{MsgTx, OutPoint, TxIn, TxOut};
 
 // BIP32 test vector 1 master key: the standard xpub and the dcrd
 // `extendedkey_test.go` dpub for the same key material must line up.
@@ -68,11 +68,45 @@ fn foreign_script(tag: u8) -> Vec<u8> {
     p2pkh_script(&[tag; 20]).to_vec()
 }
 
+/// Build the funding transaction for an input, so `prev_hash` refers to a real
+/// transaction that genuinely pays `value` to `script`. Format version 2 verifies
+/// this, so an arbitrary hash no longer works.
+fn funding_for(value: i64, script: &[u8]) -> ([u8; 32], Vec<u8>) {
+    let tx = MsgTx {
+        version: 1,
+        tx_in: vec![TxIn {
+            previous_outpoint: OutPoint {
+                hash: [0u8; 32],
+                index: 0xffff_ffff,
+                tree: 0,
+            },
+            sequence: 0xffff_ffff,
+            value_in: value,
+            block_height: 0,
+            block_index: 0xffff_ffff,
+            signature_script: vec![0x00],
+        }],
+        tx_out: vec![TxOut {
+            value,
+            version: 0,
+            pk_script: script.to_vec(),
+        }],
+        lock_time: 0,
+        expiry: 0,
+    };
+    (tx.tx_hash(), tx.serialize_full())
+}
+
 fn request_for(xpub: &str) -> (SignRequest, Vec<u8>) {
     let secp = Secp256k1::new();
     let account = ExtPubKey::from_base58(&app_decred::get_dpub(xpub).unwrap()).unwrap();
     let pk0 = account.pubkey_at(&secp, BRANCH_EXTERNAL, 0).unwrap();
     let script0 = p2pkh_script(&hash160(&pk0)).to_vec();
+    let value_in: i64 = 100_000;
+    let (prev_hash, prev_tx) = funding_for(value_in, &script0);
+    // Change back to our own internal branch, carrying the path that proves it.
+    let change_pk = account.pubkey_at(&secp, BRANCH_INTERNAL, 0).unwrap();
+    let change_script = p2pkh_script(&hash160(&change_pk)).to_vec();
     let req = SignRequest {
         format_version: FORMAT_VERSION,
         tx_version: 1,
@@ -80,14 +114,15 @@ fn request_for(xpub: &str) -> (SignRequest, Vec<u8>) {
         lock_time: 0,
         expiry: 0,
         inputs: vec![InputMeta {
-            prev_hash: [9u8; 32],
+            prev_hash,
             prev_index: 0,
             tree: 0,
             sequence: 0xffff_ffff,
-            value_in: 100_000,
+            value_in,
             branch: BRANCH_EXTERNAL,
             index: 0,
             prev_script: script0.clone(),
+            prev_tx: Some(prev_tx),
         }],
         outputs: vec![
             OutputMeta {
@@ -95,13 +130,20 @@ fn request_for(xpub: &str) -> (SignRequest, Vec<u8>) {
                 version: 0,
                 pk_script: foreign_script(0xee),
                 is_change: false,
+                branch: None,
+                index: None,
             },
-            // Foreign output the companion mislabels as change: must be flagged.
+            // Real change, proven by its derivation path. The version 1 form of this
+            // fixture used a foreign script flagged as change to exercise the tamper
+            // warning; that combination is now refused outright by validate(), so
+            // the refusal is asserted separately below.
             OutputMeta {
                 value: 1_000,
                 version: 0,
-                pk_script: foreign_script(0xdd),
+                pk_script: change_script,
                 is_change: true,
+                branch: Some(BRANCH_INTERNAL),
+                index: Some(0),
             },
         ],
         account_fp: None,
@@ -120,14 +162,18 @@ fn end_to_end_check_parse_sign_through_public_api() {
     // check: inputs re-derive from the stored xpub.
     app_decred::check_sign_request(&payload, &xpub).unwrap();
 
-    // parse: review classifies and flags the mislabelled change.
+    // parse: the review proves which output is change and excludes it from the
+    // headline amount.
     let parsed = app_decred::parse_sign_request(&payload, &xpub).unwrap();
     assert_eq!(parsed.network, "Decred Mainnet");
     assert_eq!(parsed.from.len(), 1);
     assert!(parsed.from[0].address.starts_with("Ds"));
-    assert_eq!(parsed.to.len(), 2, "both foreign outputs are recipients");
-    assert_eq!(parsed.flagged.len(), 1, "mislabelled change is flagged");
-    assert_eq!(parsed.total_send_value, "0.00091 DCR");
+    assert_eq!(parsed.to.len(), 1, "only the foreign output is a recipient");
+    assert_eq!(parsed.change.len(), 1, "our own output is proven change");
+    assert_eq!(
+        parsed.total_send_value, "0.0009 DCR",
+        "change is excluded from the amount the user approves"
+    );
     assert_eq!(parsed.fee_value, "0.00009 DCR");
 
     // sign: produced tx parses and its signature verifies against the sighash.
@@ -156,13 +202,22 @@ fn tampered_prev_script_is_refused_everywhere() {
     req.inputs[0].prev_script = foreign_script(0x11);
     let payload = encode_sign_request(&req).unwrap();
 
-    assert_eq!(
-        app_decred::check_sign_request(&payload, &xpub),
-        Err(DecredError::ScriptMismatch)
+    // Under format version 2 the tamper is caught earlier than it used to be: the
+    // declared prev_script no longer matches the funding transaction the input
+    // carries, so verification inside validate() refuses it before the
+    // derive-and-compare step could report ScriptMismatch. What matters is that
+    // every entry point refuses, so assert that rather than a specific variant.
+    assert!(
+        app_decred::check_sign_request(&payload, &xpub).is_err(),
+        "check must refuse a tampered prev_script"
     );
-    assert_eq!(
-        app_decred::sign_sign_request(&payload, &seed),
-        Err(DecredError::ScriptMismatch)
+    assert!(
+        app_decred::sign_sign_request(&payload, &seed).is_err(),
+        "the signer must refuse a tampered prev_script on its own"
+    );
+    assert!(
+        app_decred::parse_sign_request(&payload, &xpub).is_err(),
+        "the review screen must not render a tampered package either"
     );
 }
 
@@ -186,12 +241,46 @@ fn account_fingerprint_gates_wrong_wallet() {
     let payload = encode_sign_request(&req).unwrap();
     assert!(matches!(
         app_decred::check_sign_request(&payload, &xpub),
-        Err(DecredError::InvalidDataError(_))
+        Err(DecredError::WrongWalletOrAccount)
     ));
     assert!(matches!(
         app_decred::parse_sign_request(&payload, &xpub),
-        Err(DecredError::InvalidDataError(_))
+        Err(DecredError::WrongWalletOrAccount)
     ));
+}
+
+/// A request naming a different BIP44 account must be refused up front, not after
+/// the user has entered their password.
+///
+/// The device holds one account key, at m/44'/42'/0'. Previously `account` was
+/// never compared against it, so a request declaring account 1 passed the check
+/// gate and the entire review screen, then died inside the signer with a bare
+/// ScriptMismatch — after approval. It must now fail on both pre-approval paths,
+/// with the wrong-wallet code the scan UI renders as a specific message rather
+/// than a generic invalid-QR error.
+#[test]
+fn wrong_account_is_refused_before_approval() {
+    let secp = Secp256k1::new();
+    let seed = hex::decode("000102030405060708090a0b0c0d0e0f").unwrap();
+    let xpub = firmware_account_xpub(&secp, &seed);
+    let (mut req, _) = request_for(&xpub);
+
+    req.account = 1;
+    let payload = encode_sign_request(&req).unwrap();
+    assert!(matches!(
+        app_decred::check_sign_request(&payload, &xpub),
+        Err(DecredError::WrongWalletOrAccount)
+    ));
+    assert!(matches!(
+        app_decred::parse_sign_request(&payload, &xpub),
+        Err(DecredError::WrongWalletOrAccount)
+    ));
+
+    // The account this device actually holds still works.
+    req.account = 0;
+    let payload = encode_sign_request(&req).unwrap();
+    app_decred::check_sign_request(&payload, &xpub).unwrap();
+    app_decred::parse_sign_request(&payload, &xpub).unwrap();
 }
 
 #[test]

@@ -18,6 +18,13 @@ pub enum DecredError {
     SigHashIndex,
     #[error("input script does not match the wallet key (refusing to sign)")]
     ScriptMismatch,
+    /// The request was built against a different wallet or a different BIP44
+    /// account than the one this device holds. Maps to
+    /// `ErrorCodes::MasterFingerprintMismatch`, which the scan UI whitelists for a
+    /// specific "incongruent transaction" window — an `InvalidDataError` here would
+    /// be downgraded to a generic "QR code not recognized".
+    #[error("this transaction was built for a different wallet or account")]
+    WrongWalletOrAccount,
 }
 
 /// Map dcr-rs errors onto the firmware error variants (which in turn map onto

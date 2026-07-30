@@ -606,6 +606,11 @@ impl From<&DecredError> for ErrorCodes {
             DecredError::UnsupportedVersion => Self::DecredUnsupportedVersion,
             DecredError::SigHashIndex => Self::InvalidData,
             DecredError::ScriptMismatch => Self::DecredScriptMismatch,
+            // Reuse the shared wrong-wallet code rather than a Decred-specific one:
+            // GuiTransactionCheckFailed whitelists it for the "incongruent
+            // transaction" window, so the user gets the real reason instead of a
+            // generic invalid-QR error. Same treatment Zcash gives PcztNoMyInputs.
+            DecredError::WrongWalletOrAccount => Self::MasterFingerprintMismatch,
         }
     }
 }

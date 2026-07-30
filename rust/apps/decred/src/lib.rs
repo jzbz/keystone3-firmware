@@ -41,6 +41,9 @@ pub mod hd {
     pub use dcr_rs::hd::{BRANCH_EXTERNAL, BRANCH_INTERNAL};
 }
 
+/// The BIP44 account level: `m / 44' / 42' / account'`.
+const ACCOUNT_DEPTH: u8 = 3;
+
 /// Parse the stored account-level `xpub…` string into a mainnet dcr-rs key.
 /// The firmware stores the standard BIP32 form (double-SHA256 checksum); only
 /// the version bytes and checksum differ from Decred's `dpub` encoding — the
@@ -48,6 +51,21 @@ pub mod hd {
 fn account_from_xpub(xpub: &str) -> Result<ExtPubKey> {
     let key = Xpub::from_str(xpub.trim())
         .map_err(|e| DecredError::GenerateAddressError(e.to_string()))?;
+    // Xpub::from_str accepts testnet version bytes as readily as mainnet, and the
+    // network was previously discarded and hardcoded to Mainnet below. A tpub would
+    // therefore have been accepted and used to render Decred MAINNET addresses on
+    // the receive screen and the review screen. This build is mainnet-only, so
+    // refuse anything else rather than silently reinterpreting it.
+    if key.network != bitcoin::NetworkKind::Main {
+        return Err(DecredError::GenerateAddressError(
+            "expected a mainnet account extended public key".to_string(),
+        ));
+    }
+    // NOTE: depth is deliberately NOT constrained here. This helper also backs the
+    // xpub -> dpub conversion and address derivation, which are level-agnostic and
+    // are cross-checked against dcrd's published extendedkey_test.go vector for a
+    // MASTER key. The account-level requirement is enforced in check_account_key,
+    // on the paths that actually treat the key as an account key.
     Ok(ExtPubKey {
         network: Network::Mainnet,
         public_key: key.public_key,
@@ -56,6 +74,36 @@ fn account_from_xpub(xpub: &str) -> Result<ExtPubKey> {
         parent_fingerprint: key.parent_fingerprint.to_bytes(),
         child_number: u32::from(key.child_number),
     })
+}
+
+/// Check that the stored key really is an account key and that the request was
+/// built for that same account, before the user is asked for a password.
+///
+/// Two separate problems, both only reachable on the sign/review paths:
+///
+/// * `SignRequest::account` selects the account `sign_request` derives from the
+///   seed. Without this check a request naming another account passed every
+///   pre-approval gate and the whole review screen, then failed inside the signer
+///   with a bare `ScriptMismatch` — after the password had been entered and the
+///   spend approved.
+/// * Everything here derives `branch/index` below the key on the assumption that it
+///   sits at the account level. A key from another level would derive a different
+///   tree while still producing plausible-looking `Ds…` addresses.
+///
+/// The expected index comes from the key itself rather than a hardcoded 0: a BIP32
+/// account xpub carries its own child number, so this stays correct if the device
+/// ever exposes more than one account.
+fn check_account_key(req: &airgap::SignRequest, account: &ExtPubKey) -> Result<()> {
+    if account.depth != ACCOUNT_DEPTH {
+        return Err(DecredError::GenerateAddressError(
+            "expected an account-level extended public key".to_string(),
+        ));
+    }
+    let ours = account.child_number & !dcr_rs::hd::HARDENED;
+    if req.account != ours {
+        return Err(DecredError::WrongWalletOrAccount);
+    }
+    Ok(())
 }
 
 /// One display row of the transaction review screen.
@@ -94,9 +142,7 @@ pub struct ParsedDcrTx {
 fn check_account_fp(req: &airgap::SignRequest, account: &ExtPubKey) -> Result<()> {
     if let Some(fp) = req.account_fp {
         if account.fingerprint() != fp {
-            return Err(DecredError::InvalidDataError(
-                "this transaction was built for a different wallet or account".to_string(),
-            ));
+            return Err(DecredError::WrongWalletOrAccount);
         }
     }
     Ok(())
@@ -113,6 +159,7 @@ pub fn parse_sign_request(payload: &[u8], account_xpub: &str) -> Result<ParsedDc
     req.validate()?;
     let account = account_from_xpub(account_xpub)?;
     check_account_fp(&req, &account)?;
+    check_account_key(&req, &account)?;
     let summary = req.review_owned(&secp, &account)?;
 
     // Inputs are all ours (enforced by check_sign_request before signing);
@@ -158,6 +205,7 @@ pub fn check_sign_request(payload: &[u8], account_xpub: &str) -> Result<()> {
     let req = airgap::decode_sign_request(payload)?;
     let account = account_from_xpub(account_xpub)?;
     check_account_fp(&req, &account)?;
+    check_account_key(&req, &account)?;
     // Runs validate() first (structural/economic sanity), then re-derives
     // every input's script from our xpub.
     Ok(req.check_owned_inputs(&secp, &account)?)
