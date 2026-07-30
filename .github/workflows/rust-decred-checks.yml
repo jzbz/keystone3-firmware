@@ -1,0 +1,104 @@
+on:
+  pull_request:
+    paths:
+      - rust/apps/decred/**
+      - rust/rust_c/src/decred/**
+      - rust/vendor/ur-registry/src/decred/**
+      - rust/rust_c/src/common/ur.rs
+      - rust/rust_c/src/common/ur_ext.rs
+
+name: Decred Checks
+
+jobs:
+  UnitTest:
+    name: Unit Test And Code coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Read Rust toolchain
+        run: echo "RUST_TOOLCHAIN=$(cat rust-toolchain)" >> $GITHUB_ENV
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          override: true
+          components: rustfmt
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      # Thresholds are the measured figures with a little headroom (measured:
+      # regions 91.28, functions 92.31, lines 89.91), so an unrelated edit does not
+      # trip them but a real drop in coverage does.
+      - name: Run rust/apps/decred
+        run: cd rust/apps/decred && cargo +$RUST_TOOLCHAIN llvm-cov --fail-under-regions 90 --fail-under-functions 91 --fail-under-lines 88 --ignore-filename-regex 'keystore/*|utils/*'
+
+  # The rust_c Decred FFI test (dcr-sign-request UR round-trip) only builds under
+  # a simulator feature set, since the device feature set has no host panic
+  # handler. Unlike the Zcash equivalent this runs on Linux: the only host-specific
+  # dependency the simulator drags in is the `screenshots` crate, which needs xcb
+  # development headers rather than macOS. Verified to compile and pass on Linux.
+  RustCDecredTest:
+    name: rust_c Decred FFI tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install xcb headers for the simulator's screen-capture dependency
+        run: sudo apt-get update && sudo apt-get install -y libxcb1-dev libxcb-shm0-dev libxcb-randr0-dev
+
+      - name: Read Rust toolchain
+        run: echo "RUST_TOOLCHAIN=$(cat rust-toolchain)" >> $GITHUB_ENV
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          override: true
+
+      - name: Run rust_c decred tests
+        run: cd rust && cargo +$RUST_TOOLCHAIN test -p rust_c --no-default-features --features simulator-multi-coins --lib -- decred common::ur
+
+  # Every line that can lose funds -- BLAKE-256, addresses, BIP32, the wire
+  # format, the sighash, signing, and the whole air-gap package -- lives in dcr-rs,
+  # which is pinned here by revision. That pin is a one-line change, so on its own
+  # nothing in this repository would notice a rev that never passed dcr-rs's own
+  # CI. Run dcr-rs's suite at exactly the revision this firmware pins, so bumping
+  # the pin cannot slip past the consensus tests.
+  PinnedDcrRs:
+    name: dcr-rs at the pinned revision
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Extract the pinned dcr-rs revision
+        run: |
+          REV=$(grep -oP 'dcr-rs\s*=\s*\{[^}]*rev\s*=\s*"\K[0-9a-f]{40}' rust/apps/decred/Cargo.toml)
+          if [ -z "$REV" ]; then
+            echo "could not find a 40-character dcr-rs rev in rust/apps/decred/Cargo.toml" >&2
+            exit 1
+          fi
+          echo "DCR_RS_REV=$REV" >> $GITHUB_ENV
+          echo "pinned dcr-rs revision: $REV"
+
+      - name: Confirm the lockfile agrees with the manifest
+        run: |
+          grep -q "$DCR_RS_REV" rust/Cargo.lock || {
+            echo "rust/Cargo.lock does not reference the pinned revision $DCR_RS_REV" >&2
+            exit 1
+          }
+
+      - name: Checkout dcr-rs at the pinned revision
+        uses: actions/checkout@v4
+        with:
+          repository: jzbz/dcr-rs
+          ref: ${{ env.DCR_RS_REV }}
+          path: dcr-rs-pinned
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Run the dcr-rs suite
+        run: cd dcr-rs-pinned && cargo test --all-features
