@@ -27,18 +27,39 @@ void GuiSetDcrUrData(URParseResult *urResult, URParseMultiResult *urMultiResult,
     g_isMulti = multi;
 }
 
+/// The UR result the active flow is working from, or NULL if there is none.
+/// FreeDcrMemory clears both pointers, so a caller that can report failure should
+/// check rather than dereference.
+static void *DcrUrData(void)
+{
+    if (g_isMulti) {
+        return g_urMultiResult != NULL ? g_urMultiResult->data : NULL;
+    }
+    return g_urResult != NULL ? g_urResult->data : NULL;
+}
+
 void *GuiGetDcrGUIData(void)
 {
     CHECK_FREE_PARSE_RESULT(g_parseResult);
-    void *data = g_isMulti ? g_urMultiResult->data : g_urResult->data;
+    g_dcrData = NULL;
+    void *data = DcrUrData();
+    if (data == NULL) {
+        return NULL;
+    }
     char *xPub = GetCurrentAccountPublicKey(XPUB_TYPE_DCR);
 
     PtrT_TransactionParseResult_DisplayDcrTx parseResult = NULL;
     do {
         parseResult = parse_dcr_tx(data, xPub);
+        // Publish the pointer BEFORE the error check. CHECK_CHAIN_BREAK leaves the
+        // block on a parse failure, so a store placed after it never runs and the
+        // heap result — along with the error string it carries — becomes
+        // unreachable. FreeDcrMemory can only release what g_parseResult points at,
+        // so on this build the bytes would be lost from the same FreeRTOS heap the
+        // UI allocates from, on every failed parse.
+        g_parseResult = (void *)parseResult;
         CHECK_CHAIN_BREAK(parseResult);
         g_dcrData = parseResult->data;
-        g_parseResult = (void *)parseResult;
     } while (0);
     return g_parseResult;
 }
@@ -47,6 +68,13 @@ static lv_obj_t *GuiDcrTxItemList(lv_obj_t *parent, const char *title, VecFFI_Di
 
 void GuiDcrTxOverview(lv_obj_t *parent, void *totalData)
 {
+    // Refuse to render rather than dereference a NULL or freed parse result. This
+    // screen is what the user reads before authorising a spend, so a half-built
+    // version of it is worse than none.
+    if (g_dcrData == NULL) {
+        return;
+    }
+
     lv_obj_set_size(parent, 408, 480);
     lv_obj_add_flag(parent, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(parent, LV_OBJ_FLAG_CLICKABLE);
@@ -163,6 +191,15 @@ static lv_obj_t *GuiDcrTxItemList(lv_obj_t *parent, const char *title, VecFFI_Di
     return container;
 }
 
+// NOTE: these two deliberately do NOT guard against a NULL UR result, unlike
+// GuiGetDcrGUIData above. Returning NULL here would be worse than the deref it
+// avoids: ModelTransactionCheckResult in src/ui/gui_model/gui_model.c dereferences
+// the result inside its `else` branch without a NULL check, so a NULL return
+// crashes there instead. That caller bug is pre-existing, shared by every chain,
+// and already reachable through CheckUrResult's own `return NULL` for an unknown
+// view type — fixing it belongs in that file, not here. Both functions run only
+// after GuiSetDcrUrData has supplied the pointers, matching the idiom every other
+// chain uses.
 PtrT_TransactionCheckResult GuiGetDcrCheckResult(void)
 {
     void *data = g_isMulti ? g_urMultiResult->data : g_urResult->data;
@@ -181,4 +218,10 @@ void FreeDcrMemory(void)
     CHECK_FREE_UR_RESULT(g_urResult, false);
     CHECK_FREE_UR_RESULT(g_urMultiResult, true);
     CHECK_FREE_PARSE_RESULT(g_parseResult);
+    // g_dcrData points into the parse result just freed. Leaving it set would leave
+    // a dangling pointer that GuiDcrTxOverview dereferences without a guard. No
+    // current call path reaches the overview after a free, but the cost of not
+    // relying on that is one assignment, and the screen in question authorises
+    // spends.
+    g_dcrData = NULL;
 }
