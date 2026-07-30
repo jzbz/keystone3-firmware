@@ -721,6 +721,8 @@ static void RefreshQrCode(void)
         char addressString[256];
         CutAndFormatString(addressString, sizeof(addressString), addressDataItem.address, 56);
         lv_label_set_text(g_standardReceiveWidgets.addressLabel, addressString);
+    } else {
+        lv_label_set_text(g_standardReceiveWidgets.addressLabel, addressDataItem.address);
     }
 #endif
 
