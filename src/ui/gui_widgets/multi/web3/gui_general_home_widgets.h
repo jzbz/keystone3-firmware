@@ -22,6 +22,7 @@
                                        HOME_WALLET_CARD_DASH,    \
                                        HOME_WALLET_CARD_ARWEAVE, \
                                        HOME_WALLET_CARD_XLM,     \
+                                       HOME_WALLET_CARD_DCR,     \
                                        HOME_WALLET_CARD_BABYLON, \
                                        HOME_WALLET_CARD_NEUTARO, \
                                        HOME_WALLET_CARD_TIA,     \
@@ -57,8 +58,7 @@
                                        HOME_WALLET_CARD_IOV,     \
                                        HOME_WALLET_CARD_UMEE,    \
                                        HOME_WALLET_CARD_QCK,     \
-                                       HOME_WALLET_CARD_TGD,     \
-                                       HOME_WALLET_CARD_DCR // last one cant not with comma
+                                       HOME_WALLET_CARD_TGD // last one cant not with comma
 
 #define HOME_WALLET_STATE_SURPLUS                         \
     {HOME_WALLET_CARD_ETH, false, "ETH", true},           \
@@ -81,6 +81,7 @@
         {HOME_WALLET_CARD_DASH, false, "DASH", true},     \
         {HOME_WALLET_CARD_ARWEAVE, false, "AR", true},    \
         {HOME_WALLET_CARD_XLM, false, "XLM", true},       \
+        {HOME_WALLET_CARD_DCR, false, "DCR", true},       \
         {HOME_WALLET_CARD_BABYLON, false, "BABY", true},  \
         {HOME_WALLET_CARD_NEUTARO, false, "NTMPI", true}, \
         {HOME_WALLET_CARD_TIA, false, "TIA", true},       \
@@ -116,9 +117,8 @@
         {HOME_WALLET_CARD_IOV, false, "IOV", true},       \
         {HOME_WALLET_CARD_UMEE, false, "UMEE", true},     \
         {HOME_WALLET_CARD_QCK, false, "QCK", true},       \
-        {HOME_WALLET_CARD_TGD, false, "TGD", true},       \
     {                                                     \
-        HOME_WALLET_CARD_DCR, false, "DCR", true          \
+        HOME_WALLET_CARD_TGD, false, "TGD", true          \
     }
 // last one cant not with comma
 
@@ -242,6 +242,12 @@
             .coin = "XLM",                     \
             .chain = "Stellar",                \
             .icon = &coinXlm,                  \
+        },                                     \
+        {                                      \
+            .index = HOME_WALLET_CARD_DCR,     \
+            .coin = "DCR",                     \
+            .chain = "Decred",                 \
+            .icon = &coinDcr,                  \
         },                                     \
         {                                      \
             .index = HOME_WALLET_CARD_BABYLON, \
@@ -458,12 +464,6 @@
         .coin = "TGD",                         \
         .chain = "Tgrade",                     \
         .icon = &coinTgd,                      \
-    },                                         \
-    {                                          \
-        .index = HOME_WALLET_CARD_DCR,         \
-        .coin = "DCR",                         \
-        .chain = "Decred",                     \
-        .icon = &coinDcr,                      \
     }
 #endif
 #endif

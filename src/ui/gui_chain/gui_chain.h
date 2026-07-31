@@ -55,6 +55,13 @@ typedef enum {
     CHAIN_DASH,
     CHAIN_ARWEAVE,
     CHAIN_STELLAR,
+    // Sits here, before the Cosmos block, to stay numerically aligned with
+    // HOME_WALLET_CARD_DCR. The two enums are passed interchangeably in places
+    // (SetCoinWallet takes a GuiChainCoinType but receives a HOME_WALLET_CARD_*
+    // value from the receive screen), and the Manage Coins tab filter partitions
+    // purely on the card ordinal at the Cosmos boundary — so appending Decred after
+    // the Cosmos block listed it under "COSMOS Eco".
+    CHAIN_DCR,
 
     // cosmos start
     CHAIN_BABYLON,
@@ -94,7 +101,6 @@ typedef enum {
     CHAIN_QCK,
     CHAIN_TGD,
     // cosmos end
-    CHAIN_DCR,
 #endif
 
 #ifndef BTC_ONLY
