@@ -862,6 +862,15 @@ static void ConfirmHandler(lv_event_t *e)
 
 static bool IsAccountSwitchable()
 {
+    // Decred is a UTXO chain, and the wallet-link export is an account-level dpub,
+    // so a companion watches the whole external branch while the device could only
+    // ever display m/44'/42'/0'/0/0. Handled outside the WEB3 block because Decred
+    // also reaches this view on the cypherpunk build, where everything below is
+    // compiled out; the address index itself is stored per coin name by
+    // GetAccountReceiveIndex, so no new index slot is needed.
+    if (g_chainCard == HOME_WALLET_CARD_DCR) {
+        return true;
+    }
 #ifdef WEB3_VERSION
     // all cosmos chain can switch account
     if (IsCosmosChain(g_chainCard)) {
