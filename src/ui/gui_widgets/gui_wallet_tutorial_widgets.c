@@ -517,7 +517,14 @@ void GuiWalletTutorialInit(WALLET_LIST_INDEX_ENUM tutorialIndex)
     g_pageWidget = CreatePageWidget();
     cont = g_pageWidget->contentZone;
     g_walletTutorialWidget.cont = cont;
-    label = GuiCreateIllustrateLabel(cont, tutorial->desc);
+    // g_tutorials is a zero-initialized table indexed by wallet, so any wallet
+    // without an entry arrives here with desc == NULL. That reaches
+    // lv_label_set_text(label, NULL), which LVGL treats as "refresh the current
+    // text" rather than as an error, leaving the constructor default in place — so
+    // the screen renders the literal placeholder "Text". Degrade to an empty label
+    // instead, which reads as an unfinished page rather than as a bug. Decred has no
+    // entry yet, and neither do WALLET_LIST_JUPITER or WALLET_LIST_NUFI upstream.
+    label = GuiCreateIllustrateLabel(cont, tutorial->desc != NULL ? tutorial->desc : "");
     lv_obj_align(label, LV_ALIGN_DEFAULT, 36, 12);
     lv_obj_set_style_text_opa(label, LV_OPA_80, LV_PART_MAIN | LV_STATE_DEFAULT);
 

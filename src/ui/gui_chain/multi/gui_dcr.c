@@ -116,7 +116,12 @@ void GuiDcrTxOverview(lv_obj_t *parent, void *totalData)
         last_view = GuiDcrTxItemList(container, _("To"), g_dcrData->to, NULL, last_view);
     }
     if (g_dcrData->change != NULL && g_dcrData->change->size > 0) {
-        last_view = GuiDcrTxItemList(container, _("Change"), g_dcrData->change, "Change", last_view);
+        // The tag goes through _() like the section header above it. Passing the
+        // literal produced a screen that contradicted itself: the "Change" heading
+        // was translated while the pill directly beneath it stayed English. The key
+        // is already in the string table for every supported language, so this needs
+        // no new translations.
+        last_view = GuiDcrTxItemList(container, _("Change"), g_dcrData->change, _("Change"), last_view);
     }
 }
 
