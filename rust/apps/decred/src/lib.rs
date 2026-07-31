@@ -259,3 +259,83 @@ pub fn get_address(account_xpub: &str, branch: u32, index: u32) -> Result<String
 pub fn get_dpub(account_xpub: &str) -> Result<String> {
     Ok(account_from_xpub(account_xpub)?.to_base58())
 }
+
+/// Extract the BIP44 account index from a Decred account path.
+///
+/// Accepts exactly `M/44'/42'/<account>'` (case-insensitive leading `m`, `'` or `h`
+/// for hardened). Anything else is refused rather than coerced, so a mistyped table
+/// entry in `account_public_info.c` fails loudly instead of silently deriving some
+/// other wallet.
+pub fn account_index_from_path(path: &str) -> Result<u32> {
+    let bad = || DecredError::GenerateAddressError(alloc::format!("bad decred account path: {path}"));
+    let mut parts = path.trim().split('/');
+    match parts.next() {
+        Some(p) if p.eq_ignore_ascii_case("m") => {}
+        _ => return Err(bad()),
+    }
+    let mut hardened = |expected: Option<u32>| -> Result<u32> {
+        let seg = parts.next().ok_or_else(bad)?;
+        let digits = seg
+            .strip_suffix('\'')
+            .or_else(|| seg.strip_suffix('h'))
+            .or_else(|| seg.strip_suffix('H'))
+            .ok_or_else(bad)?;
+        let v: u32 = digits.parse().map_err(|_| bad())?;
+        if v >= crate::hd_hardened() {
+            return Err(bad());
+        }
+        match expected {
+            Some(want) if v != want => Err(bad()),
+            _ => Ok(v),
+        }
+    };
+    hardened(Some(44))?;
+    hardened(Some(42))?;
+    let account = hardened(None)?;
+    if parts.next().is_some() {
+        return Err(bad());
+    }
+    Ok(account)
+}
+
+/// The hardened-index threshold, kept as a helper so the parser above does not need
+/// to name dcr-rs's constant inline.
+fn hd_hardened() -> u32 {
+    dcr_rs::hd::HARDENED
+}
+
+/// Derive the Decred account extended public key from the seed, returned in the
+/// standard BIP32 `xpub…` encoding the firmware stores.
+///
+/// This exists because Decred's hardened derivation is NOT strict BIP32. dcrd's
+/// hdkeychain strips leading zero bytes from a child private key before feeding it
+/// to the next hardened HMAC, and dcrwallet uses that variant for the whole
+/// `m/44'/42'/account'` path. The firmware's shared secp256k1 keystore helper
+/// implements strict BIP32, so for roughly one seed in 112 -- those where an
+/// intermediate hardened child key has a leading zero byte -- it produces a
+/// different account key from every other Decred wallet holding the same phrase.
+///
+/// Deriving here instead means the stored xpub, the exported dpub, the addresses
+/// shown on the receive screen and the keys `sign_request` derives from the seed
+/// all come from one implementation. Routing Decred through the generic
+/// `get_extended_pubkey_by_seed` would leave the display and the signer disagreeing
+/// for those seeds: the review would pass, using the stored xpub, and signing would
+/// then fail with a script mismatch after the user had already approved.
+///
+/// Only the encoding is BIP32-standard; the key material is Decred-derived. The
+/// firmware stores xpub rather than dpub because everything downstream parses it
+/// with [`account_from_xpub`], and the 74-byte key body is identical either way.
+pub fn get_account_xpub_by_seed(seed: &[u8], account: u32) -> Result<String> {
+    let secp = Secp256k1::new();
+    let master = ExtPrivKey::master_from_seed(seed, Network::Mainnet)?;
+    let key = master.account_key(&secp, account)?.neuter(&secp);
+    let xpub = Xpub {
+        network: bitcoin::NetworkKind::Main,
+        depth: key.depth,
+        parent_fingerprint: bitcoin::bip32::Fingerprint::from(key.parent_fingerprint),
+        child_number: bitcoin::bip32::ChildNumber::from(key.child_number),
+        public_key: key.public_key,
+        chain_code: bitcoin::bip32::ChainCode::from(key.chain_code),
+    };
+    Ok(xpub.to_string())
+}

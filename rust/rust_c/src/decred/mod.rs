@@ -7,7 +7,7 @@ use crate::common::{
     ur::{UREncodeResult, FRAGMENT_MAX_LENGTH_DEFAULT},
     utils::{convert_c_char, recover_c_char},
 };
-use crate::extract_array_mut;
+use crate::{extract_array, extract_array_mut};
 use crate::{extract_ptr_with_type, make_free_method};
 use alloc::string::ToString;
 use cty::c_char;
@@ -26,6 +26,37 @@ pub unsafe extern "C" fn dcr_get_address(
     let xpub = recover_c_char(xpub);
     match app_decred::get_address(&xpub, BRANCH_EXTERNAL, index) {
         Ok(address) => SimpleResponse::success(convert_c_char(address)).simple_c_ptr(),
+        Err(e) => SimpleResponse::from(e).simple_c_ptr(),
+    }
+}
+
+/// Derive the Decred account extended public key from the seed.
+///
+/// Decred must not go through the shared `get_extended_pubkey_by_seed`: that helper
+/// implements strict BIP32, while Decred's hardened derivation strips leading zero
+/// bytes from the child private key, as dcrd's hdkeychain and dcrwallet do. The two
+/// disagree for roughly one seed in 112, which would leave the stored xpub -- and so
+/// the receive screen and the exported dpub -- describing a different wallet from
+/// the one `sign_dcr_tx` derives from the same seed.
+///
+/// `path` is accepted for symmetry with the generic helper and to keep the account
+/// index declarative in `account_public_info.c`; only `M/44'/42'/account'` is valid.
+/// The returned string is standard BIP32 `xpub…` encoding of Decred-derived key
+/// material, which is what the rest of the firmware parses.
+#[no_mangle]
+pub unsafe extern "C" fn dcr_get_extended_pubkey_by_seed(
+    seed: PtrBytes,
+    seed_len: u32,
+    path: PtrString,
+) -> *mut SimpleResponse<c_char> {
+    let seed = extract_array!(seed, u8, seed_len as usize);
+    let path = recover_c_char(path);
+    let account = match app_decred::account_index_from_path(&path) {
+        Ok(account) => account,
+        Err(e) => return SimpleResponse::from(e).simple_c_ptr(),
+    };
+    match app_decred::get_account_xpub_by_seed(seed, account) {
+        Ok(xpub) => SimpleResponse::success(convert_c_char(xpub)).simple_c_ptr(),
         Err(e) => SimpleResponse::from(e).simple_c_ptr(),
     }
 }

@@ -54,13 +54,45 @@ fn bad_xpub_maps_to_generate_address_error() {
     ));
 }
 
-/// The account xpub exactly as the firmware produces it: bitcoin-crate BIP32
-/// from the seed at m/44'/42'/0', neutered and serialized as `xpub…`.
-fn firmware_account_xpub(secp: &Secp256k1<dcr_rs::secp256k1::All>, seed: &[u8]) -> String {
+/// The account xpub exactly as the firmware produces it.
+///
+/// This must go through get_account_xpub_by_seed, not bitcoin-crate BIP32: Decred's
+/// hardened derivation strips leading zero bytes from the child private key, so the
+/// two disagree for roughly one seed in 112, and the firmware now derives the stored
+/// xpub the Decred way. Deriving it the strict way here would test a path the
+/// firmware no longer takes -- and would keep passing, because the seed below has no
+/// leading-zero intermediate keys and so agrees under both variants.
+fn firmware_account_xpub(_secp: &Secp256k1<dcr_rs::secp256k1::All>, seed: &[u8]) -> String {
+    app_decred::get_account_xpub_by_seed(seed, 0).unwrap()
+}
+
+/// The strict-BIP32 derivation the shared secp256k1 keystore helper performs, kept
+/// so the divergence test below can compare the two.
+fn strict_bip32_account_xpub(secp: &Secp256k1<dcr_rs::secp256k1::All>, seed: &[u8]) -> String {
     let master = Xpriv::new_master(NetworkKind::Main, seed).unwrap();
     let path = DerivationPath::from_str("m/44'/42'/0'").unwrap();
     let account = master.derive_priv(secp, &path).unwrap();
     Xpub::from_priv(secp, &account).to_string()
+}
+
+/// The account path parser refuses anything that is not m/44'/42'/<account>'.
+#[test]
+fn account_path_parsing_is_strict() {
+    assert_eq!(app_decred::account_index_from_path("M/44'/42'/0'").unwrap(), 0);
+    assert_eq!(app_decred::account_index_from_path("m/44'/42'/7'").unwrap(), 7);
+    for bad in [
+        "M/44'/42'/0",    // account not hardened
+        "M/44'/0'/0'",    // wrong coin type
+        "M/44'/42'",      // too short
+        "M/44'/42'/0'/0", // too long
+        "44'/42'/0'",     // no master prefix
+        "M/44'/42'/x'",   // not a number
+    ] {
+        assert!(
+            app_decred::account_index_from_path(bad).is_err(),
+            "must refuse {bad}"
+        );
+    }
 }
 
 /// A 25-byte P2PKH script that is NOT ours (arbitrary hash160).
@@ -69,8 +101,10 @@ fn foreign_script(tag: u8) -> Vec<u8> {
 }
 
 /// Build the funding transaction for an input, so `prev_hash` refers to a real
-/// transaction that genuinely pays `value` to `script`. Format version 2 verifies
-/// this, so an arbitrary hash no longer works.
+/// transaction that genuinely pays `value` to `script`. The package carries the
+/// PREFIX serialization only: a Decred txid is blake256 over the prefix, so the
+/// witness was transmitted and then ignored. Format version 3 refuses a full
+/// serialization outright rather than tolerating it.
 fn funding_for(value: i64, script: &[u8]) -> ([u8; 32], Vec<u8>) {
     let tx = MsgTx {
         version: 1,
@@ -94,7 +128,7 @@ fn funding_for(value: i64, script: &[u8]) -> ([u8; 32], Vec<u8>) {
         lock_time: 0,
         expiry: 0,
     };
-    (tx.tx_hash(), tx.serialize_full())
+    (tx.tx_hash(), tx.serialize_prefix())
 }
 
 fn request_for(xpub: &str) -> (SignRequest, Vec<u8>) {
@@ -122,7 +156,7 @@ fn request_for(xpub: &str) -> (SignRequest, Vec<u8>) {
             branch: BRANCH_EXTERNAL,
             index: 0,
             prev_script: script0.clone(),
-            prev_tx: Some(prev_tx),
+            prev_tx_prefix: Some(prev_tx),
         }],
         outputs: vec![
             OutputMeta {
@@ -352,5 +386,52 @@ fn version_gate_maps_to_unsupported_version() {
     assert_eq!(
         app_decred::check_sign_request(&payload, &xpub),
         Err(DecredError::UnsupportedVersion)
+    );
+}
+
+/// The firmware must derive the account key with Decred's hardened variant, and
+/// the whole flow must agree with itself when it does.
+///
+/// Seed chosen because it exercises the divergence: dcrd's hdkeychain strips leading
+/// zero bytes from a child private key before the next hardened HMAC, strict BIP32
+/// does not, and for this seed the two produce different account keys. Roughly one
+/// seed in 112 does.
+///
+/// The second half is the point. Routing Decred through the shared secp256k1
+/// keystore helper would store the strict-BIP32 xpub while sign_request derived the
+/// Decred one from the same seed, so the review would pass -- it re-derives from the
+/// stored xpub -- and signing would then refuse, after the user had approved and
+/// entered their password.
+#[test]
+fn account_key_uses_decred_hardened_derivation() {
+    let secp = Secp256k1::new();
+    let seed = hex::decode("0000012500000000a5a5a5a500000000").unwrap();
+
+    let dcr_xpub = app_decred::get_account_xpub_by_seed(&seed, 0).unwrap();
+    let strict_xpub = strict_bip32_account_xpub(&secp, &seed);
+    assert_ne!(
+        Xpub::from_str(&dcr_xpub).unwrap().public_key,
+        Xpub::from_str(&strict_xpub).unwrap().public_key,
+        "this seed must diverge in KEY MATERIAL, not merely in the serialized string -- \
+         the parent fingerprint alone differs for every seed, since Decred's hash160 is \
+         RIPEMD160(BLAKE-256) rather than RIPEMD160(SHA-256)"
+    );
+
+    // Derived the Decred way: check, review and sign all agree.
+    let (req, _) = request_for(&dcr_xpub);
+    let payload = encode_sign_request(&req).unwrap();
+    app_decred::check_sign_request(&payload, &dcr_xpub).unwrap();
+    app_decred::parse_sign_request(&payload, &dcr_xpub).unwrap();
+    app_decred::sign_sign_request(&payload, &seed).unwrap();
+
+    // Derived the strict way: the review still passes, because it re-derives from
+    // the same stored xpub, and only the signer notices.
+    let (req, _) = request_for(&strict_xpub);
+    let payload = encode_sign_request(&req).unwrap();
+    app_decred::check_sign_request(&payload, &strict_xpub).unwrap();
+    let got = app_decred::sign_sign_request(&payload, &seed);
+    assert!(
+        matches!(got, Err(DecredError::ScriptMismatch)),
+        "a strict-BIP32 xpub must fail to sign, which is the bug this prevents; got {got:?}"
     );
 }

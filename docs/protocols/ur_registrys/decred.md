@@ -7,7 +7,7 @@ This protocol is based on the [Uniform Resources](https://github.com/BlockchainC
 Keystone's QR workflow involves two main steps: linking the wallet and signing data, broken down into three sub-steps:
 
 1. **Wallet Linking:** Keystone displays the account extended public key as a Decred `dpub…` string in a QR code. The watch-only wallet imports it to track balances and build unsigned transactions.
-2. **Transaction Creation:** The watch-only wallet creates an unsigned-transaction package and displays it as a `dcr-sign-request` UR for Keystone to scan, verify, and display. As of format version 2 the package must include the funding transaction for every input and the derivation path of every change output, so that the signer can verify the amounts and prove change ownership instead of trusting the companion. A watch-only wallet already has both from the chain, but it must retain the funding transactions rather than only the utxo amounts.
+2. **Transaction Creation:** The watch-only wallet creates an unsigned-transaction package and displays it as a `dcr-sign-request` UR for Keystone to scan, verify, and display. As of format version 3 the package must include, for every input, the **prefix serialization** of the funding transaction that created it, and for every change output its derivation path, so the signer can verify the amounts and prove change ownership instead of trusting the companion. A watch-only wallet already has both from the chain, but it must retain the funding transactions rather than only the utxo amounts.
 3. **Signing Authorization:** Keystone signs the transaction and displays the broadcast-ready result as a `dcr-signed-tx` UR for the watch-only wallet to scan and broadcast.
 
 ### Decred Accounts
@@ -24,11 +24,11 @@ dcr-sign-request = {
 
 Registry type: `dcr-sign-request`, tag 8701.
 
-The `data` payload is a CBOR **array** (minicbor derive layout), **format version 2**:
+The `data` payload is a CBOR **array** (minicbor derive layout), **format version 3**:
 
 ```cddl
 sign-request-package = [
-    format_version: uint,      ; 2 — version 1 is REFUSED, see below
+    format_version: uint,      ; 3 — versions 1 and 2 are REFUSED, see below
     tx_version: uint,          ; Decred tx version; MUST be 1
     account: uint,             ; BIP44 account (hardened index without the flag)
     lock_time: uint,
@@ -41,35 +41,41 @@ sign-request-package = [
 ]
 
 input-meta = [
-    prev_hash: [32*32 uint],   ; previous outpoint hash (internal byte order)
+    prev_hash: bytes,          ; previous outpoint hash (internal byte order)
     prev_index: uint,
     tree: uint,                ; 0 = regular tree (the only tree Keystone signs)
     sequence: uint,
     value_in: int,             ; atoms
     branch: uint,              ; 0 external / 1 internal
     index: uint,               ; address index below the account
-    prev_script: [* uint],     ; prevout pkScript bytes
-    prev_tx: [* uint],         ; REQUIRED: the serialized funding transaction
-                               ; that created this prevout (prefix + witness)
+    prev_script: bytes,        ; prevout pkScript bytes
+    prev_tx_prefix: bytes,     ; REQUIRED: the PREFIX serialization
+                               ; (TxSerializeNoWitness) of the funding
+                               ; transaction that created this prevout
 ]
 
 output-meta = [
     value: int,                ; atoms
     version: uint,             ; script version; MUST be 0
-    pk_script: [* uint],       ; output pkScript bytes
+    pk_script: bytes,          ; output pkScript bytes
     is_change: bool,
     ? branch: uint,            ; REQUIRED iff is_change; 0 external / 1 internal
     ? index: uint,             ; REQUIRED iff is_change; address index
 ]
 ```
 
-Encoding note: minicbor omits trailing absent optionals, so element counts vary
-and a decoder must accept the short forms. A recipient output is a 4-element
-array; a change output is 6. A package without `account_fp` is a 7-element array;
-with it, 8. `prev_tx` is not optional in version 2 — it is the last element of
-every `input-meta`, which is therefore always 9 elements.
+Encoding notes. Byte-valued fields (`prev_hash`, `prev_script`, `prev_tx_prefix`,
+`pk_script`) are CBOR **byte strings**, not arrays of integers. Version 2 emitted
+the latter, which cost two bytes on the wire for every byte at or above 0x18 and
+so very nearly doubled the payload that dominates a package.
 
-### Why version 2 exists
+minicbor omits trailing absent optionals, so element counts vary and a decoder
+must accept the short forms. A recipient output is a 4-element array; a change
+output is 6. A package without `account_fp` is a 7-element array; with it, 8.
+`prev_tx_prefix` is not optional — it is the last element of every `input-meta`,
+which is therefore always 9 elements.
+
+### Why versions 2 and 3 exist
 
 Decred's signature hash does not commit to input amounts. In version 1 the only
 source for an input's value was the companion's `value_in`, and a signer had no
@@ -82,7 +88,7 @@ internally consistent, so no device-side check could detect it.
 
 Version 2 supplies the missing evidence:
 
-* `prev_tx` lets the signer verify `value_in` and `prev_script` against a
+* `prev_tx_prefix` lets the signer verify `value_in` and `prev_script` against a
   transaction hash it computes itself, rather than trusting an assertion.
 * `branch`/`index` on change outputs let the signer prove ownership by deriving
   that one key, replacing a heuristic scan of a window of addresses guessed from
@@ -90,11 +96,21 @@ Version 2 supplies the missing evidence:
   recipient and simultaneously reported it as evidence of a hostile companion —
   against an address that belonged to the user.
 
-**Version 1 packages are refused, not accepted on a reduced-trust path.** The
-sender chooses the version, so a signer that still accepted version 1 would let a
-hostile companion opt out of verification entirely and the attack above would
-remain fully exploitable. Verification is worth only as much as the refusal of
-unverified packages.
+**Older packages are refused, not accepted on a reduced-trust path.** The sender
+chooses the version, so a signer that still accepted version 1 would let a hostile
+companion opt out of verification entirely and the attack above would remain fully
+exploitable. Verification is worth only as much as the refusal of unverified
+packages.
+
+Version 3 changes only the encoding, not what is verified. Byte-valued fields
+became CBOR byte strings, and `prev_tx` became `prev_tx_prefix`, carrying the
+prefix serialization rather than the full transaction: a Decred txid is BLAKE-256
+over the prefix alone, so the witness — signature scripts, the bulk of a
+transaction — was transmitted and then ignored. Together these cut a typical
+package to roughly a third of its size, which for a QR transport is the difference
+between three frames and one. A full serialization is refused rather than
+tolerated, so a companion that was not updated fails loudly instead of silently
+shipping several times the bytes for no added verification.
 
 ### Verification a signer MUST perform
 
@@ -105,7 +121,7 @@ noted, so a signer can reject before prompting for a password.
 
 Structural:
 
-1. `format_version` equals 2.
+1. `format_version` equals 3.
 2. `tx_version` equals 1. Only version 1 is standard, and DCP0008 caps the
    consensus version at 3, so anything else assembles into a transaction the
    network will not mine.
@@ -129,7 +145,7 @@ a fee above `FEE_ALWAYS_ALLOWED_ATOMS` (100,000 atoms, 0.001 DCR) is rejected wh
 it also exceeds `1 / MAX_FEE_FRACTION_DIVISOR` (currently 1/20, i.e. 5%) of the
 input total. The absolute floor exists so dust consolidation, where the fee is
 legitimately a large share of a small total, still works. Note this ceiling is
-only meaningful *because* of the `prev_tx` verification above — applied to version
+only meaningful *because* of the `prev_tx_prefix` verification above — applied to version
 1's asserted amounts it bounded nothing, since the understatement attack declares
 a small fee and the real one materialises only after dcrd substitutes the true
 values.
@@ -139,12 +155,14 @@ make a small device grind or allocate without bound.
 
 Amount verification, per input:
 
-9. `prev_tx` is present and parses as a Decred transaction.
+9. `prev_tx_prefix` is present and parses as a Decred transaction **prefix**. A
+    full (prefix + witness) serialization must be refused: the serialization-type
+    word is checked, so an un-migrated companion fails loudly.
 10. Its transaction hash equals `prev_hash`. Note the hash rule: a Decred txid is
     a **single** BLAKE-256 over the **prefix** serialization — not a double hash,
     and not over the full serialization. (Double BLAKE-256 is used for the
     base58check address checksum, which is a different thing.)
-11. `prev_tx` has an output at `prev_index`, and that output's value equals
+11. `prev_tx_prefix` has an output at `prev_index`, and that output's value equals
     `value_in` and its `pk_script` equals `prev_script`.
 
 Ownership, requiring the account public key:
@@ -169,13 +187,23 @@ courtesy check only; the verification above remains the fund protector.
 
 ### Implementation status
 
-`dcr-rs` implements version 2 as specified here. The KeyOS/Passport Prime
-`decred-core` implementation still speaks version 1 and must be updated before
-the two are interoperable again; until then, treat cross-device agreement on the
-version 2 byte layout as unverified. The layout regression test in `dcr-rs`
-(`cbor_layout_pins_v2_encoding`) is generated by `dcr-rs` itself and should be
-regenerated from `decred-core` once that side lands, restoring it to a genuine
-cross-implementation check.
+`dcr-rs` implements version 3 as specified here, and this firmware pins it.
+
+The KeyOS/Passport Prime `decred-core` implementation is a re-export of `dcr-rs`
+pinned to an older revision that still speaks version 1, so the two are not
+interoperable until that pin is advanced. Treat cross-device agreement on the
+version 3 byte layout as unverified until then: the layout regression test in
+`dcr-rs` is generated by `dcr-rs` itself, and should be regenerated from
+`decred-core` once that side lands, restoring it to a genuine cross-implementation
+check rather than a self-referential one.
+
+Note for anyone advancing that pin: the same range of `dcr-rs` revisions also
+changes hardened key derivation to match dcrd's `hdkeychain`, which strips leading
+zero bytes from a child private key where strict BIP32 does not. The account key at
+`m/44'/42'/0'` therefore changes for roughly one seed in 112, and any wallet
+already generated under the strict variant is a different wallet — one no other
+Decred wallet can see. This firmware derives the account key through `dcr-rs` for
+exactly that reason, rather than through its generic secp256k1 keystore helper.
 
 ### CDDL for Decred Signed Transaction
 

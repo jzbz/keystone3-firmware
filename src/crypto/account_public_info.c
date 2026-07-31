@@ -41,6 +41,12 @@ typedef enum {
     ZCASH_UFVK_ENCRYPTED,
     EDWARDS_25519,
     MONERO_PVK,
+    // secp256k1, but with Decred's hardened derivation rather than strict BIP32.
+    // dcrd's hdkeychain strips leading zero bytes from a child private key before
+    // the next hardened HMAC, and dcrwallet derives the whole m/44'/42'/account'
+    // path that way, so SECP256K1 above produces a different account key for
+    // roughly one seed in 112 -- a wallet no other Decred wallet can see.
+    DECRED_SECP256K1,
 } PublicInfoType_t;
 
 typedef struct {
@@ -534,7 +540,7 @@ static const ChainItem_t g_chainTable[] = {
     {XPUB_TYPE_STELLAR_4,             ED25519,       "stellar_4",                "M/44'/148'/4'"    },
     {XPUB_TYPE_TON_BIP39,             ED25519,       "ton_bip39",                "M/44'/607'/0'"    },
     {XPUB_TYPE_ZEC_TRANSPARENT_LEGACY, SECP256K1,     "zec_transparent_legacy",   "M/44'/133'/0'"    },
-    {XPUB_TYPE_DCR,                   SECP256K1,     "dcr",                      "M/44'/42'/0'"     },
+    {XPUB_TYPE_DCR,                   DECRED_SECP256K1, "dcr",                      "M/44'/42'/0'"     },
 #endif
 
 #ifdef CYPHERPUNK_VERSION
@@ -546,7 +552,7 @@ static const ChainItem_t g_chainTable[] = {
     {ZCASH_UFVK_ENCRYPTED_0,          ZCASH_UFVK_ENCRYPTED, "zcash_ufvk_0",      "M/32'/133'/0'"    },
     {XPUB_TYPE_MONERO_0,              EDWARDS_25519,  "monero_0",                "M/44'/128'/0'"    },
     {XPUB_TYPE_MONERO_PVK_0,          MONERO_PVK,     "monero_pvk_0",            ""                 },
-    {XPUB_TYPE_DCR,                   SECP256K1,      "dcr",                     "M/44'/42'/0'"     },
+    {XPUB_TYPE_DCR,                   DECRED_SECP256K1, "dcr",                     "M/44'/42'/0'"     },
 #endif
 
 #ifdef BTC_ONLY
@@ -609,6 +615,11 @@ static SimpleResponse_c_char *ProcessKeyType(uint8_t *seed, int len, int cryptoK
     switch (cryptoKey) {
     case SECP256K1:
         return get_extended_pubkey_by_seed(seed, len, (char *)path);
+    case DECRED_SECP256K1:
+        // Must not fall through to SECP256K1: see the enum comment. Deriving here
+        // keeps the stored xpub, the exported dpub, the receive addresses and the
+        // keys sign_dcr_tx derives from the seed all coming from one implementation.
+        return dcr_get_extended_pubkey_by_seed(seed, len, (char *)path);
     case ED25519:
         return get_ed25519_pubkey_by_seed(seed, len, (char *)path);
     case BIP32_ED25519:
