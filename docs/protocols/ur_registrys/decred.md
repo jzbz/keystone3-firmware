@@ -200,7 +200,7 @@ check rather than a self-referential one.
 Note for anyone advancing that pin: the same range of `dcr-rs` revisions also
 changes hardened key derivation to match dcrd's `hdkeychain`, which strips leading
 zero bytes from a child private key where strict BIP32 does not. The account key at
-`m/44'/42'/0'` therefore changes for roughly one seed in 112, and any wallet
+`m/44'/42'/0'` therefore changes for roughly one seed in 130, and any wallet
 already generated under the strict variant is a different wallet — one no other
 Decred wallet can see. This firmware derives the account key through `dcr-rs` for
 exactly that reason, rather than through its generic secp256k1 keystore helper.

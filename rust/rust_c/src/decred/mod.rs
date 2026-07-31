@@ -35,7 +35,7 @@ pub unsafe extern "C" fn dcr_get_address(
 /// Decred must not go through the shared `get_extended_pubkey_by_seed`: that helper
 /// implements strict BIP32, while Decred's hardened derivation strips leading zero
 /// bytes from the child private key, as dcrd's hdkeychain and dcrwallet do. The two
-/// disagree for roughly one seed in 112, which would leave the stored xpub -- and so
+/// disagree for roughly one seed in 130, which would leave the stored xpub -- and so
 /// the receive screen and the exported dpub -- describing a different wallet from
 /// the one `sign_dcr_tx` derives from the same seed.
 ///

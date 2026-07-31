@@ -58,7 +58,7 @@ fn bad_xpub_maps_to_generate_address_error() {
 ///
 /// This must go through get_account_xpub_by_seed, not bitcoin-crate BIP32: Decred's
 /// hardened derivation strips leading zero bytes from the child private key, so the
-/// two disagree for roughly one seed in 112, and the firmware now derives the stored
+/// two disagree for roughly one seed in 130, and the firmware now derives the stored
 /// xpub the Decred way. Deriving it the strict way here would test a path the
 /// firmware no longer takes -- and would keep passing, because the seed below has no
 /// leading-zero intermediate keys and so agrees under both variants.
@@ -395,7 +395,8 @@ fn version_gate_maps_to_unsupported_version() {
 /// Seed chosen because it exercises the divergence: dcrd's hdkeychain strips leading
 /// zero bytes from a child private key before the next hardened HMAC, strict BIP32
 /// does not, and for this seed the two produce different account keys. Roughly one
-/// seed in 112 does.
+/// seed in 130 does -- the master key is exempt from stripping, which is what the
+/// 1-in-256 second factor in that figure reflects.
 ///
 /// The second half is the point. Routing Decred through the shared secp256k1
 /// keystore helper would store the strict-BIP32 xpub while sign_request derived the
@@ -405,7 +406,7 @@ fn version_gate_maps_to_unsupported_version() {
 #[test]
 fn account_key_uses_decred_hardened_derivation() {
     let secp = Secp256k1::new();
-    let seed = hex::decode("0000012500000000a5a5a5a500000000").unwrap();
+    let seed = hex::decode("0000011d000000005eed123400000000").unwrap();
 
     let dcr_xpub = app_decred::get_account_xpub_by_seed(&seed, 0).unwrap();
     let strict_xpub = strict_bip32_account_xpub(&secp, &seed);
@@ -435,3 +436,4 @@ fn account_key_uses_decred_hardened_derivation() {
         "a strict-BIP32 xpub must fail to sign, which is the bug this prevents; got {got:?}"
     );
 }
+

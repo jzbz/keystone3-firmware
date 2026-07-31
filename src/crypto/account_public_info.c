@@ -45,7 +45,7 @@ typedef enum {
     // dcrd's hdkeychain strips leading zero bytes from a child private key before
     // the next hardened HMAC, and dcrwallet derives the whole m/44'/42'/account'
     // path that way, so SECP256K1 above produces a different account key for
-    // roughly one seed in 112 -- a wallet no other Decred wallet can see.
+    // roughly one seed in 130 -- a wallet no other Decred wallet can see.
     DECRED_SECP256K1,
 } PublicInfoType_t;
 

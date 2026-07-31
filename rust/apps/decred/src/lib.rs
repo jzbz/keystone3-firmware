@@ -11,7 +11,7 @@
 //!   * pre-formats amounts/addresses into the review-screen structs, and
 //!   * maps errors onto the firmware error codes (see `errors.rs`).
 //!
-//! Trust model, as of dcr-rs format version 2: display classification is done by
+//! Trust model, as of dcr-rs format version 3: display classification is done by
 //! the device from the account xpub, signing re-derives every input key, and input
 //! amounts are verified against the funding transaction each input carries rather
 //! than taken on the companion's word. `validate()` performs that verification, so
@@ -311,7 +311,7 @@ fn hd_hardened() -> u32 {
 /// hdkeychain strips leading zero bytes from a child private key before feeding it
 /// to the next hardened HMAC, and dcrwallet uses that variant for the whole
 /// `m/44'/42'/account'` path. The firmware's shared secp256k1 keystore helper
-/// implements strict BIP32, so for roughly one seed in 112 -- those where an
+/// implements strict BIP32, so for roughly one seed in 130 -- those where an
 /// intermediate hardened child key has a leading zero byte -- it produces a
 /// different account key from every other Decred wallet holding the same phrase.
 ///
