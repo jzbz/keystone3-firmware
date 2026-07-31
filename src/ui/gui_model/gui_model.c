@@ -1580,7 +1580,15 @@ static int32_t ModelCheckTransaction(const void *inData, uint32_t inDataLen)
     if (g_checkResult != NULL && g_checkResult->error_code == 0) {
         GuiApiEmitSignal(SIG_TRANSACTION_CHECK_PASS, NULL, 0);
     } else {
-        printf("transaction check fail, error code: %d, error msg: %s\r\n", g_checkResult->error_code, g_checkResult->error_message);
+        // The condition above already admits g_checkResult == NULL, so this branch
+        // must not assume otherwise. CheckUrResult returns NULL for a view type with
+        // no handler entry, which made this printf a live null dereference on the
+        // transaction-check path for every chain.
+        if (g_checkResult != NULL) {
+            printf("transaction check fail, error code: %d, error msg: %s\r\n", g_checkResult->error_code, g_checkResult->error_message);
+        } else {
+            printf("transaction check produced no result, view type %d\r\n", viewType);
+        }
         GuiApiEmitSignal(SIG_HIDE_TRANSACTION_LOADING, NULL, 0);
         GuiApiEmitSignal(SIG_TRANSACTION_CHECK_FAIL, g_checkResult, sizeof(g_checkResult));
     }

@@ -217,6 +217,20 @@ void GuiTransactionCheckPass(void)
 //Here return the error code and error message so that we can distinguish the error type later.
 void GuiTransactionCheckFailed(PtrT_TransactionCheckResult result)
 {
+    // A NULL result is reachable: CheckUrResult returns NULL for a view type with
+    // no handler entry, and a chain handler can return NULL when it has nothing to
+    // check. Fail closed with the generic error rather than dereferencing, and
+    // still run the cleanup below so the check result and any PSBT memory are
+    // released on this path too.
+    if (result == NULL) {
+        ThrowError(ERR_INVALID_QRCODE);
+        GuiModelTransactionCheckResultClear();
+#if BTC_ONLY
+        FreePsbtUxtoMemory();
+#endif
+        return;
+    }
+
     switch (result->error_code) {
     case BitcoinNoMyInputs:
     case BitcoinWalletTypeError:
