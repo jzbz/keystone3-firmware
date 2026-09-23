@@ -6,6 +6,8 @@ on:
       - rust/vendor/ur-registry/src/decred/**
       - rust/rust_c/src/common/ur.rs
       - rust/rust_c/src/common/ur_ext.rs
+      # A dcr-rs bump within the manifest's semver range touches only the lockfile.
+      - rust/Cargo.lock
 
 name: Decred Checks
 
@@ -63,42 +65,43 @@ jobs:
 
   # Every line that can lose funds -- BLAKE-256, addresses, BIP32, the wire
   # format, the sighash, signing, and the whole air-gap package -- lives in dcr-rs,
-  # which is pinned here by revision. That pin is a one-line change, so on its own
-  # nothing in this repository would notice a rev that never passed dcr-rs's own
-  # CI. Run dcr-rs's suite at exactly the revision this firmware pins, so bumping
-  # the pin cannot slip past the consensus tests.
+  # which comes from crates.io at the version and checksum rust/Cargo.lock records.
+  # Bumping it can touch nothing but the lockfile, so on its own nothing in this
+  # repository would notice a release whose own suite does not pass. Run dcr-rs's
+  # suite on exactly the crate this firmware locks -- the published .crate, checked
+  # against the lockfile checksum -- so a bump cannot slip past the consensus tests.
   PinnedDcrRs:
-    name: dcr-rs at the pinned revision
+    name: dcr-rs at the locked version
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
 
-      - name: Extract the pinned dcr-rs revision
+      - name: Read the locked dcr-rs version and checksum
         run: |
-          REV=$(grep -oP 'dcr-rs\s*=\s*\{[^}]*rev\s*=\s*"\K[0-9a-f]{40}' rust/apps/decred/Cargo.toml)
-          if [ -z "$REV" ]; then
-            echo "could not find a 40-character dcr-rs rev in rust/apps/decred/Cargo.toml" >&2
+          if [ "$(grep -c '^name = "dcr-rs"$' rust/Cargo.lock)" != 1 ]; then
+            echo "rust/Cargo.lock must lock exactly one dcr-rs" >&2
             exit 1
           fi
-          echo "DCR_RS_REV=$REV" >> $GITHUB_ENV
-          echo "pinned dcr-rs revision: $REV"
-
-      - name: Confirm the lockfile agrees with the manifest
-        run: |
-          grep -q "$DCR_RS_REV" rust/Cargo.lock || {
-            echo "rust/Cargo.lock does not reference the pinned revision $DCR_RS_REV" >&2
+          ENTRY=$(awk '/^\[\[package\]\]$/ { p = 0 } /^name = "dcr-rs"$/ { p = 1 } p' rust/Cargo.lock)
+          VERSION=$(printf '%s\n' "$ENTRY" | sed -n 's/^version = "\(.*\)"$/\1/p')
+          SOURCE=$(printf '%s\n' "$ENTRY" | sed -n 's/^source = "\(.*\)"$/\1/p')
+          CHECKSUM=$(printf '%s\n' "$ENTRY" | sed -n 's/^checksum = "\([0-9a-f]\{64\}\)"$/\1/p')
+          if [ "$SOURCE" != "registry+https://github.com/rust-lang/crates.io-index" ] || [ -z "$VERSION" ] || [ -z "$CHECKSUM" ]; then
+            echo "rust/Cargo.lock does not lock dcr-rs from crates.io with a checksum" >&2
             exit 1
-          }
+          fi
+          echo "DCR_RS_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "DCR_RS_CHECKSUM=$CHECKSUM" >> $GITHUB_ENV
+          echo "locked dcr-rs: $VERSION ($CHECKSUM)"
 
-      - name: Checkout dcr-rs at the pinned revision
-        uses: actions/checkout@v4
-        with:
-          repository: jzbz/dcr-rs
-          ref: ${{ env.DCR_RS_REV }}
-          path: dcr-rs-pinned
+      - name: Download the locked crate and check it against the lockfile
+        run: |
+          curl -fsSL -o dcr-rs.crate "https://static.crates.io/crates/dcr-rs/dcr-rs-$DCR_RS_VERSION.crate"
+          echo "$DCR_RS_CHECKSUM  dcr-rs.crate" | sha256sum -c -
+          tar -xzf dcr-rs.crate
 
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Run the dcr-rs suite
-        run: cd dcr-rs-pinned && cargo test --all-features
+        run: cd "dcr-rs-$DCR_RS_VERSION" && cargo test --all-features --locked

@@ -1544,8 +1544,9 @@ dependencies = [
 
 [[package]]
 name = "dcr-rs"
-version = "0.5.0"
-source = "git+https://github.com/jzbz/dcr-rs?rev=39015c46a8f53b2150529d4772ca9b7843ee8c65#39015c46a8f53b2150529d4772ca9b7843ee8c65"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46c6be86526bc909d25e618eac201395c9c56deab3029ede300058b93eb37456"
 dependencies = [
  "bs58",
  "hmac 0.12.1",
